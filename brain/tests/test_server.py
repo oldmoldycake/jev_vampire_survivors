@@ -82,6 +82,17 @@ async def test_overlapping_tick_gets_reused_reply(tmp_path):
     await srv.stop()
 
 
+async def test_stop_cancels_in_flight_tasks(tmp_path):
+    jev = SlowJev()   # first ask blocks until the gate is set; we never set it
+    srv, hub, stats, reader, writer = await _start(tmp_path, jev)
+    await _send(writer, {"id": 1, "type": "tick", "t": 0.0, "state": make_state()})
+    await asyncio.sleep(0.05)
+    assert len(srv._tasks) == 1
+    writer.close()
+    await asyncio.wait_for(srv.stop(), 1.0)
+    assert srv._tasks == set()
+
+
 async def test_events_drive_run_log_and_picks(tmp_path):
     jev = FakeJev(script={"character": ("IMELDA", {"IMELDA": 0.9, "ANTONIO": 0.1}, 0.8),
                          "level_up": ("SPINACH", {"SPINACH": 1.0}, 1.0)})

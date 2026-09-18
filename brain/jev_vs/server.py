@@ -28,6 +28,7 @@ class PluginServer:
         self._server: asyncio.AbstractServer | None = None
         self._writer: asyncio.StreamWriter | None = None
         self._in_flight = False
+        self._tasks: set[asyncio.Task] = set()
         self.last_direction: dict | None = None
         self.latest_decisions: dict[str, dict] = {}
         self.recent_log: list[dict] = []
@@ -47,6 +48,10 @@ class PluginServer:
     async def stop(self) -> None:
         if self._writer is not None:
             self._writer.close()
+        for task in self._tasks:
+            task.cancel()
+        if self._tasks:
+            await asyncio.gather(*self._tasks, return_exceptions=True)
         if self._server is not None:
             self._server.close()
             await self._server.wait_closed()
@@ -83,6 +88,17 @@ class PluginServer:
         self._publish_stats()
         return payload
 
+    def _spawn(self, coro) -> asyncio.Task:
+        task = asyncio.create_task(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._task_done)
+        return task
+
+    def _task_done(self, task: asyncio.Task) -> None:
+        self._tasks.discard(task)
+        if not task.cancelled() and task.exception() is not None:
+            log.exception("handler task failed", exc_info=task.exception())
+
     # ------------------------------------------------------------ connection
     async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         peer = writer.get_extra_info("peername")
@@ -116,9 +132,9 @@ class PluginServer:
         if t == "hello":
             self._note(f"plugin hello: game {msg.get('game_version')} plugin {msg.get('plugin_version')}")
         elif t == "tick":
-            asyncio.create_task(self._on_tick(msg, writer))
+            self._spawn(self._on_tick(msg, writer))
         elif t == "event":
-            asyncio.create_task(self._on_event(msg, writer))
+            self._spawn(self._on_event(msg, writer))
         else:
             log.warning("unknown message type %r", t)
 
@@ -164,6 +180,7 @@ class PluginServer:
             await self._reply(writer, protocol.noop_reply(mid))
             return
         options = list(msg.get("options", []))
+        # No options means no pick and no run can start, so no run log opens either (ruling 2026-09-18).
         if not options:
             await self._reply(writer, protocol.noop_reply(mid))
             self._note(f"{event} with no options; noop")
