@@ -276,3 +276,15 @@ def test_is_stuck_false_when_trail_is_shorter_than_the_window():
     mem.note_position(0.0, 0.0, 0.0, "north")
     mem.note_position(TH.stuck_window_s - 0.5, 0.0, 0.0, "north")
     assert mem.is_stuck(4.0, TH) is False
+
+
+def test_is_stuck_true_for_a_realistic_jittered_trail():
+    # Real ticks land roughly every 0.25s with frame jitter, and the run clock is rounded to two
+    # decimals -- so the oldest sample within exactly stuck_window_s is often a hair short of it.
+    # This is the exact shape that broke the original oldest-sample-in-trail implementation
+    # (see fix(brain): make the stuck check reachable with real tick timing).
+    mem = digest.BlockMemory(TH)
+    seconds = [0.0, 0.26, 0.49, 0.77, 1.01, 1.24, 1.53, 1.76, 2.02, 2.24, 2.51, 2.78, 3.0]
+    for i, t in enumerate(seconds):
+        mem.note_position(t, 0.001 * i, 0.0, "north")   # barely moving, a real direction applied throughout
+    assert mem.is_stuck(4.0, TH) is True

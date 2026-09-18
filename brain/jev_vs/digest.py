@@ -148,23 +148,34 @@ class BlockMemory:
         return {d for d, t in self._blocked_at.items() if now - t < self._th.block_memory_s}
 
     def note_position(self, seconds: float, x: float, y: float, applied_direction: str | None) -> None:
-        """Feed one tick's position sample; drops anything older than stuck_window_s."""
+        """Feed one tick's position sample.
+
+        Keeps twice stuck_window_s of history, not just one window's worth: real ticks land
+        roughly every 0.25s with frame jitter and a run clock rounded to two decimals, so trimming
+        to exactly one window would usually leave the oldest surviving sample a hair short of a
+        full window old, and is_stuck would never find an anchor to measure from. Keeping double
+        the window guarantees there is always a sample at least a full window old once enough time
+        has passed, however the ticks happened to land.
+        """
         self._trail.append((seconds, x, y, applied_direction))
-        cutoff = seconds - self._th.stuck_window_s
+        cutoff = seconds - self._th.stuck_window_s * 2.0
         self._trail = [sample for sample in self._trail if sample[0] >= cutoff]
 
     def is_stuck(self, half_h: float, th: Thresholds) -> bool:
-        """True when the trail spans the full stuck window, barely moved, and wasn't just standing still."""
+        """True when some sample at least a full stuck window old is close to the latest position,
+        and a real direction was applied at some point since that anchor -- not just standing still."""
         if not self._trail:
             return False
-        oldest, newest = self._trail[0], self._trail[-1]
-        if newest[0] - oldest[0] < th.stuck_window_s:
+        newest = self._trail[-1]
+        old_enough = [(i, s) for i, s in enumerate(self._trail) if newest[0] - s[0] >= th.stuck_window_s]
+        if not old_enough:
             return False
-        dist = math.hypot(newest[1] - oldest[1], newest[2] - oldest[2])
+        anchor_i, anchor = old_enough[-1]   # the most recent sample that is still a full window old
+        dist = math.hypot(newest[1] - anchor[1], newest[2] - anchor[2])
         frac = dist / half_h if half_h > 0 else float("inf")
         if frac >= th.stuck_move_frac:
             return False
-        return any(sample[3] in SECTORS for sample in self._trail)
+        return any(sample[3] in SECTORS for sample in self._trail[anchor_i:])
 
     def clear(self) -> None:
         """Forget everything; call at the start of a new run."""
