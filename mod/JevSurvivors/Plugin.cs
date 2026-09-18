@@ -33,6 +33,7 @@ namespace JevSurvivors
 
         internal Transport Transport { get; private set; }
         internal StateSampler Sampler { get; private set; }
+        internal MenuDriver Menu { get; private set; }
 
         private Harmony _harmony;
 
@@ -58,6 +59,7 @@ namespace JevSurvivors
             Transport = new Transport(Host.Value, Port.Value, HelloJson);
             Transport.Start();
             Sampler = new StateSampler(Transport);
+            Menu = new MenuDriver(this, Transport);
             _harmony = new Harmony(Id);
             _harmony.PatchAll(typeof(Plugin).Assembly);
             Log.LogInfo($"{Name} {Version} loaded; automation={Automation}");
@@ -68,8 +70,8 @@ namespace JevSurvivors
             if (Input.GetKeyDown(ToggleKey.Value)) SetAutomation(!Automation, "hotkey");
             Transport.Pump(OnUnsolicited);
             Sampler.Update();
+            Menu.Update();
             Movement.Expire();
-            Probe.Update();
         }
 
         private static string HelloJson()
