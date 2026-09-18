@@ -10,6 +10,7 @@ from jev_vs.config import Config
 from jev_vs.dashboard import make_app
 from jev_vs.decide import Decider, Decision
 from jev_vs.hub import Hub
+from jev_vs.pins import PinStore
 from jev_vs.questions import DEFAULT_THRESHOLDS as TH
 from jev_vs.runlog import RunLog
 from jev_vs.server import PluginServer
@@ -20,7 +21,12 @@ from tests.conftest import FakeJev
 @pytest.fixture
 async def plugin_server(tmp_path):
     srv = PluginServer(
-        Config(plugin_port=0, log_dir=str(tmp_path)), Decider(FakeJev(), TH), RunLog(tmp_path), Hub(maxsize=4), Stats()
+        Config(plugin_port=0, log_dir=str(tmp_path)),
+        Decider(FakeJev(), TH),
+        RunLog(tmp_path),
+        Hub(maxsize=4),
+        Stats(),
+        PinStore(tmp_path / "pins.json"),
     )
     await srv.start()
     yield srv

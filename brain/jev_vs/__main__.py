@@ -17,6 +17,7 @@ from .dashboard import make_app, run_dashboard
 from .decide import Decider
 from .hub import Hub
 from .jev_client import JevClient
+from .pins import PinStore
 from .questions import DEFAULT_THRESHOLDS
 from .runlog import RunLog
 from .server import PluginServer
@@ -35,7 +36,9 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 def build(config: Config, jev=None) -> tuple[PluginServer, web.Application]:
     jev = jev or JevClient(model=config.model, timeout_s=config.request_timeout_s, max_retries=config.max_retries)
-    server = PluginServer(config, Decider(jev, DEFAULT_THRESHOLDS), RunLog(Path(config.log_dir)), Hub(), Stats())
+    pins = PinStore(Path(config.state_file))
+    pins.load()  # a pin set in a previous session, and the rosters its dropdowns showed
+    server = PluginServer(config, Decider(jev, DEFAULT_THRESHOLDS), RunLog(Path(config.log_dir)), Hub(), Stats(), pins)
     return server, make_app(server)
 
 

@@ -10,6 +10,7 @@ from . import protocol
 from .config import Config
 from .decide import Decider, Decision
 from .hub import Hub
+from .pins import PIN_KINDS, PinStore
 from .questions import VARIETY_KINDS
 from .runlog import RunLog
 from .stats import Stats
@@ -39,12 +40,13 @@ def _recent_values(history: list[dict], key: str, limit: int = RECENT_HISTORY_LI
 
 
 class PluginServer:
-    def __init__(self, config: Config, decider: Decider, runlog: RunLog, hub: Hub, stats: Stats):
+    def __init__(self, config: Config, decider: Decider, runlog: RunLog, hub: Hub, stats: Stats, pins: PinStore):
         self.config = config
         self.decider = decider
         self.runlog = runlog
         self.hub = hub
         self.stats = stats
+        self.pins = pins
         self._server: asyncio.AbstractServer | None = None
         self._writer: asyncio.StreamWriter | None = None
         self._in_flight = False
@@ -100,6 +102,32 @@ class PluginServer:
         await self._reply(self._writer, protocol.control(automation))
         self._note(f"automation {'resumed' if automation else 'paused'} from dashboard")
         return True
+
+    def set_pin(self, kind: str, option_id: str | None) -> bool:
+        """Pin a menu choice from the dashboard, or clear it with None. Re-broadcast either way so
+        every open tab agrees. Pins apply from the next menu onward; a run in progress asked its
+        character and stage questions long ago and has nothing to disturb."""
+        if not self.pins.set_pin(kind, option_id):
+            log.warning("ignoring pin request for kind %r id %r", kind, option_id)
+            return False
+        self.hub.publish({"type": "pin", "kind": kind, "id": option_id})
+        self._note(f"{kind} pinned to {option_id}" if option_id else f"{kind} pin cleared; Jev decides")
+        return True
+
+    def _resolve_pin(self, kind: str, options: list[dict]) -> int | None:
+        """Cache what this menu offered, tell the dashboards, and resolve any pin against it.
+        Returns the index to apply, or None to ask Jev as usual."""
+        if kind not in PIN_KINDS:
+            return None
+        self.hub.publish({"type": "roster", "kind": kind, "options": self.pins.remember_options(kind, options)})
+        pinned = self.pins.pin_for(kind)
+        if pinned is None:
+            return None
+        index = self.pins.index_of(kind, options)
+        if index is None:
+            # Leave the pin set: a character you are about to unlock stays pinned (spec 3.3).
+            self._note(f"pinned {pinned} not offered; asked Jev")
+        return index
 
     def _record_decision(self, d: Decision, **extra) -> dict:
         payload = {"type": "decision", **d.to_dict(), **extra}
@@ -237,8 +265,11 @@ class PluginServer:
             self.runlog.start_run({})
             self.current_run = {"started_at": time.time()}
             self.hub.publish({"type": "run", "phase": "start", "meta": self.current_run})
-        recent = _recent_values(self.run_history, kind) if kind in VARIETY_KINDS else None
-        decision = await self.decider.pick(kind, options, msg.get("build"), recent=recent)
+        pinned_index = self._resolve_pin(kind, options)
+        # A pinned pick never varies, so the "recently played" nudge would be wasted wording.
+        varies = kind in VARIETY_KINDS and pinned_index is None
+        recent = _recent_values(self.run_history, kind) if varies else None
+        decision = await self.decider.pick(kind, options, msg.get("build"), recent=recent, pinned_index=pinned_index)
         chosen = options[decision.index]
         reply_index = chosen.get("index", decision.index)
         await self._reply(

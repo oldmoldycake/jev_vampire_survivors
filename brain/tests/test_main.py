@@ -12,14 +12,16 @@ def test_parse_args_defaults_and_overrides(tmp_path):
 
 
 async def test_build_wires_server_and_app(tmp_path):
-    srv, app = build(Config(plugin_port=0, log_dir=str(tmp_path)))
+    cfg = Config(plugin_port=0, log_dir=str(tmp_path), state_file=str(tmp_path / "pins.json"))
+    srv, app = build(cfg)
     assert srv.config.plugin_port == 0
     routes = {r.resource.canonical for r in app.router.routes()}
     assert "/" in routes and "/ws" in routes
     assert srv.decider.jev is not None
+    assert srv.pins.path == tmp_path / "pins.json"
 
     from tests.conftest import FakeJev
 
     fake = FakeJev()
-    srv2, _ = build(Config(plugin_port=0, log_dir=str(tmp_path)), jev=fake)
+    srv2, _ = build(cfg, jev=fake)
     assert srv2.decider.jev is fake

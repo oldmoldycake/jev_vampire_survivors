@@ -5,6 +5,7 @@ from pathlib import Path
 from jev_vs.config import Config
 from jev_vs.decide import Decider
 from jev_vs.hub import Hub
+from jev_vs.pins import PinStore
 from jev_vs.questions import DEFAULT_THRESHOLDS as TH
 from jev_vs.runlog import RunLog
 from jev_vs.server import PluginServer
@@ -27,10 +28,13 @@ class SlowJev(FakeJev):
         return await super().ask(state, questions)
 
 
-async def _start(tmp_path: Path, jev):
+async def _start(tmp_path: Path, jev, pins: PinStore | None = None):
     hub = Hub()
     stats = Stats()
-    srv = PluginServer(Config(plugin_port=0, log_dir=str(tmp_path)), Decider(jev, TH), RunLog(tmp_path), hub, stats)
+    store = pins if pins is not None else PinStore(tmp_path / "pins.json")
+    srv = PluginServer(
+        Config(plugin_port=0, log_dir=str(tmp_path)), Decider(jev, TH), RunLog(tmp_path), hub, stats, store
+    )
     port = await srv.start()
     reader, writer = await asyncio.open_connection("127.0.0.1", port)
     return srv, hub, stats, reader, writer
@@ -238,4 +242,74 @@ async def test_send_control_reaches_plugin_and_reports_absence(tmp_path):
     await asyncio.sleep(0.05)
     assert await srv.send_control(True) is False
     assert stats.snapshot()["plugin_connected"] is False
+    await srv.stop()
+
+
+async def test_pinned_character_is_applied_without_asking_jev(tmp_path):
+    jev = FakeJev(script={"character": ("ANTONIO", {"ANTONIO": 1.0}, 0.9)})
+    pins = PinStore(tmp_path / "pins.json")
+    pins.set_pin("character", "IMELDA")
+    srv, _hub, stats, reader, writer = await _start(tmp_path, jev, pins)
+    chars = [
+        {"id": "ANTONIO", "name": "Antonio", "description": "d"},
+        {"id": "IMELDA", "name": "Imelda", "description": "d"},
+    ]
+    await _send(writer, {"id": 1, "type": "event", "event": "character_select", "options": chars})
+    reply = await _recv(reader)
+    assert reply["index"] == 1 and reply["choice"] == "IMELDA" and reply["source"] == "human"
+    assert jev.calls == []  # the pin cost nothing
+    snap = stats.snapshot()
+    assert snap["calls"] == 1 and snap["jev_calls"] == 0 and snap["fallback_calls"] == 0
+    assert snap["jev_ok"] is True
+    assert srv.current_run["character"] == "IMELDA"
+    writer.close()
+    await srv.stop()
+
+
+async def test_a_pin_that_is_not_offered_falls_through_to_jev(tmp_path):
+    jev = FakeJev(script={"stage": ("LIBRARY", {"LIBRARY": 1.0}, 0.9)})
+    pins = PinStore(tmp_path / "pins.json")
+    pins.set_pin("stage", "MOONGOLOW")  # a stage this save has not unlocked
+    srv, _hub, _stats, reader, writer = await _start(tmp_path, jev, pins)
+    opts = [
+        {"id": "FOREST", "name": "Mad Forest", "description": "d"},
+        {"id": "LIBRARY", "name": "Inlaid Library", "description": "d"},
+    ]
+    await _send(writer, {"id": 1, "type": "event", "event": "stage_select", "options": opts})
+    reply = await _recv(reader)
+    assert reply["choice"] == "LIBRARY" and reply["source"] == "jev"
+    assert len(jev.calls) == 1
+    assert any("pinned MOONGOLOW not offered" in e["text"] for e in srv.recent_log)
+    assert pins.pin_for("stage") == "MOONGOLOW"  # kept for when it does unlock
+    writer.close()
+    await srv.stop()
+
+
+async def test_menu_options_are_cached_and_broadcast_as_a_roster(tmp_path):
+    srv, hub, _stats, reader, writer = await _start(tmp_path, FakeJev())
+    q = hub.subscribe()
+    chars = [{"id": "ANTONIO", "name": "Antonio", "description": "a long description"}]
+    await _send(writer, {"id": 1, "type": "event", "event": "character_select", "options": chars})
+    await _recv(reader)
+    msgs = [q.get_nowait() for _ in range(q.qsize())]
+    roster = next(m for m in msgs if m["type"] == "roster")
+    assert roster == {"type": "roster", "kind": "character", "options": [{"id": "ANTONIO", "name": "Antonio"}]}
+    assert srv.pins.rosters["character"] == [{"id": "ANTONIO", "name": "Antonio"}]
+    writer.close()
+    await srv.stop()
+
+
+async def test_set_pin_persists_broadcasts_and_refuses_other_kinds(tmp_path):
+    srv, hub, _stats, reader, writer = await _start(tmp_path, FakeJev())
+    q = hub.subscribe()
+    assert srv.set_pin("character", "ANTONIO") is True
+    assert srv.set_pin("level_up", "SPINACH") is False
+    msgs = [q.get_nowait() for _ in range(q.qsize())]
+    assert {"type": "pin", "kind": "character", "id": "ANTONIO"} in msgs
+    reloaded = PinStore(tmp_path / "pins.json")
+    reloaded.load()
+    assert reloaded.pin_for("character") == "ANTONIO"
+    assert srv.set_pin("character", None) is True
+    assert any("pin cleared" in e["text"] for e in srv.recent_log)
+    writer.close()
     await srv.stop()
