@@ -105,7 +105,7 @@ One JSON object per line, UTF-8. Every plugin message that expects an answer car
 
 Enemies, gems, and pickups are those the game reports in screen bounds, sorted by distance to the player, capped at `max_entities` (default 200 each). Positions are Unity world units relative to the player, and `screen` gives the half extents of the visible area in the same units so the brain can bucket distances relative to what is on screen. `t` is seconds since the run started.
 
-`level_up` and `weapon_select` options share one shape. The plugin sets `evolution_ready: true` on a weapon option when `LevelUpFactory.HasEvolutionRequirements` reports its evolution requirements are met; the brain only phrases that flag, it never computes it.
+`level_up` and `weapon_select` options share one shape. The plugin sets `evolution_ready: true` on a weapon option when every entry in that weapon's `WeaponData.evoSynergy` list is already among the player's active weapons or passives (the game's own `LevelUpFactory.HasEvolutionRequirements` is private and judges the evolved weapon, not the offered one, so the plugin does this small check itself); the brain only phrases that flag, it never computes it.
 
 ### Brain to plugin
 
@@ -163,14 +163,14 @@ Responsibilities:
 - **Transport**: background thread owning the TCP connection, reconnecting on failure. Outgoing messages are queued from the Unity main thread; incoming replies are stored and consumed on the main thread. No Unity API is touched off the main thread.
 - **Tick sampler**: a MonoBehaviour that every `1 / tick_hz` seconds, while a run is active and automation is on, builds the tick state from `GM.Core`, its `Stage`, and the player `CharacterController`, and sends it.
 - **Movement**: a Harmony postfix on the player controller's per-frame input read overwrites `_currentDirectionRaw` and `_currentDirection` with the latest `move` vector while automation is on. The exact method is confirmed by decompilation in the first implementation task.
-- **Menu driver**: Harmony postfixes on `OnShowStart` of `LandingScreenPage`, `SaveSlotsPage`, `MainMenuPage`, `CharacterSelectionPage`, `WeaponSelectionPage`, `StageSelectPage`, `ArcanaMainSelectionPage`, `LevelUpPage` (after its intro animation completes), `OpenTreasurePage`, `ItemFoundPage`, `CharacterFoundPage`, `GameOverPage`, and `RecapPage`. Each waits a short configurable delay for the page to finish populating, gathers its options, sends the event, and applies the reply through the page's own methods (`ForceSelectCharacter` and `ConfirmCharacter`, `SelectStage` and `ConfirmStage`, the level-up item's `Select`, `Quit`, or the page's default confirm).
+- **Menu driver**: Harmony postfixes on `Start` of `LandingScreenPage` and on `OnShowStart` of `MainMenuPage`, `CharacterSelectionPage`, `WeaponSelectionPage`, `StageSelectPage`, `ArcanaMainSelectionPage`, `LevelUpPage` (after its intro animation completes), `OpenTreasurePage`, `ItemFoundPage`, `CharacterFoundPage`, `GameOverPage`, and `RecapPage`. Each waits a short configurable delay for the page to finish populating, gathers its options, sends the event, and applies the reply through the page's own methods (`ForceSelectCharacter` and `ConfirmCharacter`, `SelectStage` and `ConfirmStage`, the level-up item's `Select`, `Quit`, or the page's default confirm).
 - **Safety net**: any `BaseUIPage` subclass without a specific handler that stays open longer than `unknown_page_timeout_s` (default 10) gets its default confirm invoked, and the incident is logged.
 - **Kill switch**: F9 or a `control` message from the brain toggles automation. When off, movement and menu hooks do nothing and the human plays; ticks are still sent so the brain keeps logging and the dashboard keeps drawing.
 - **Config** (`BepInEx/config/JevSurvivors.cfg`): host, port, tick_hz, reply timeouts, max_entities, hotkey, autoplay_on_boot, max_runs (0 = unlimited), pause_between_runs_s.
 
 ## 7. Run loop
 
-1. Game boots. Landing and save-slot pages are confirmed.
+1. Game boots. The landing page ("press any key") is continued.
 2. Main menu shows. Plugin calls `ShowCharacterSelect`.
 3. Character select shows. Plugin sends the unlocked list, applies the pick, confirms. If a weapon selection page appears, the plugin sends a `weapon_select` event, which the brain answers with the level-up question.
 4. Stage select shows. Plugin sends available stages, applies the pick, confirms with default modifiers (no hyper, hurry, inverse, or endless).
@@ -281,10 +281,8 @@ In-game overlay drawn by the mod, live game video embedded in the dashboard (str
 These depend on reading decompiled method bodies and are settled in the first implementation task, not in this spec:
 
 - The exact per-frame method on `CharacterController` that reads Rewired input, to place the movement postfix.
-- Whether `LevelUpItemUI.Select` or `LevelUpPage.SelectWeapon` / `SelectItem` is the right call, and when `_spawnedItems` is fully populated.
-- The parameter types of `ForceSelectCharacter`, `SelectStage`, and `ConfirmStage`, and where character and stage descriptions come from in `DataManager`.
-- Which confirm method each dismissable page exposes.
-- The plugin target framework and whether the publicizer is needed, both decided by the spike.
+- Resolved 2026-09-17 by decompiling `VampireSurvivors.Runtime.dll` (see the plugin plan): movement is a Harmony prefix on `CharacterController.ProcessRawDirection`; level-up items are read from `LevelUpPage.LevelUpItems` after `EnableLevelupOptions` and applied with `LevelUpItemUI.Select()`; character select uses `ShowCharacterInfo` then `SelectCharacter(false)` then `ConfirmCharacter()`; stage select uses `SetInfoPanel` then `SelectStage()` then `ConfirmStage()`; the landing page is a plain `MonoBehaviour` whose `MoveToNextView()` continues; `SaveSlotsPage` is a menu-reachable manager, not a boot step; the generic confirm is `BaseUIPage.OnEnterPressed()`.
+- Still open, decided by the spike: the plugin target framework (`netstandard2.1` expected, `net472` fallback) and whether BepInEx 5 boots this Unity 6 build.
 
 ## 15. References
 
