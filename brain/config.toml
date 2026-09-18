@@ -1,0 +1,17 @@
+# Runtime settings for the Jev Vampire Survivors brain.
+# Question wording and thresholds are NOT here: see jev_vs/questions.py.
+
+[plugin]
+host = "127.0.0.1"
+port = 48231
+
+[dashboard]
+host = "127.0.0.1"
+port = 48232
+
+[brain]
+tick_hz = 4.0
+model = "jev-latest"
+request_timeout_s = 0.8
+max_retries = 1
+log_dir = "runs"
