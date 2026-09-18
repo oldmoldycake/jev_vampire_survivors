@@ -199,3 +199,48 @@ async def test_fallback_warnings_are_rate_limited(caplog):
     debugs = [r for r in caplog.records if r.name == "jev_vs.decide" and r.levelno == logging.DEBUG]
     assert len(warnings) == 1
     assert len(debugs) == 4
+
+
+async def test_pick_with_a_pinned_index_never_asks_jev():
+    fake = FakeJev(script={"character": ("ANTONIO", {"ANTONIO": 1.0}, 0.9)})
+    dec = decide.Decider(fake, TH)
+    opts = [
+        {"id": "ANTONIO", "name": "Antonio", "description": "d"},
+        {"id": "IMELDA", "name": "Imelda", "description": "d"},
+    ]
+    decision = await dec.pick("character", opts, pinned_index=1)
+    assert decision.choice == "IMELDA" and decision.index == 1
+    assert decision.source == "human"
+    assert decision.probabilities == {"IMELDA": 1.0}
+    assert decision.confidence == 1.0
+    assert decision.latency_ms == 0.0 and decision.input_tokens == 0
+    assert decision.sampled is False
+    assert decision.labels["IMELDA"] == "Imelda"  # the dashboard card still gets its labels
+    assert decision.instructions  # ... and the question text
+    assert fake.calls == []  # no API call, so no cost and no menu latency
+
+
+async def test_pick_with_a_pinned_index_skips_the_variety_sampler():
+    # Left to itself the sampler would sometimes return ANTONIO here; pinned, it never can.
+    fake = FakeJev(script={"character": ("ANTONIO", {"ANTONIO": 0.5, "IMELDA": 0.5}, 0.9)})
+    dec = decide.Decider(fake, TH, rng=random.Random(1))
+    opts = [
+        {"id": "ANTONIO", "name": "Antonio", "description": "d"},
+        {"id": "IMELDA", "name": "Imelda", "description": "d"},
+    ]
+    for _ in range(10):
+        decision = await dec.pick("character", opts, recent=["IMELDA"], pinned_index=0)
+        assert decision.choice == "ANTONIO" and decision.sampled is False
+    assert fake.calls == []
+
+
+async def test_pick_without_a_pinned_index_is_unchanged():
+    fake = FakeJev(script={"stage": ("LIBRARY", {"LIBRARY": 1.0}, 0.7)})
+    dec = decide.Decider(fake, TH)
+    opts = [
+        {"id": "FOREST", "name": "Mad Forest", "description": "d"},
+        {"id": "LIBRARY", "name": "Inlaid Library", "description": "d"},
+    ]
+    decision = await dec.pick("stage", opts)
+    assert decision.source == "jev" and decision.choice == "LIBRARY"
+    assert len(fake.calls) == 1

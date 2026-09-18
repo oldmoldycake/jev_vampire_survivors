@@ -30,7 +30,7 @@ class Decision:
     probabilities: dict[str, float]
     confidence: float
     latency_ms: float
-    source: str  # "jev" | "fallback"
+    source: str  # "jev" | "human" | "fallback"
     input_tokens: int = 0
     instructions: str = ""
     labels: dict[str, str] = field(default_factory=dict)
@@ -152,11 +152,36 @@ class Decider:
         return candidates[-1][0]  # floating-point rounding fallback
 
     async def pick(
-        self, kind: str, options: list[dict], build: dict | None = None, recent: list[str] | None = None
+        self,
+        kind: str,
+        options: list[dict],
+        build: dict | None = None,
+        recent: list[str] | None = None,
+        pinned_index: int | None = None,
     ) -> Decision:
+        """Choose one option. `pinned_index`'s contract is "this index is offered, use it" —
+        whether a human's pin is honourable for this menu is decided in server.py, which has
+        the options and the event log (spec section 3.3)."""
         if not options:
             raise ValueError(f"{kind}: no options to pick from")
         ask = options_question(kind, options, build, recent=recent)
+        if pinned_index is not None:
+            # A human already decided. The Ask above is pure and the dashboard card needs its
+            # labels, but asking Jev would spend money and menu latency to confirm a foregone
+            # conclusion, so we don't; variety sampling is bypassed by construction.
+            choice = ask.keys[pinned_index]
+            return Decision(
+                kind=kind,
+                choice=choice,
+                index=pinned_index,
+                probabilities={choice: 1.0},
+                confidence=1.0,
+                latency_ms=0.0,
+                source="human",
+                input_tokens=0,
+                instructions=ask.instructions,
+                labels=ask.labels,
+            )
         choice, probs, conf, latency, tokens = await self._ask(ask)
         source = "jev"
         sampled = False
