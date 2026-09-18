@@ -1,4 +1,5 @@
 import logging
+import random
 
 import pytest
 
@@ -91,6 +92,38 @@ async def test_real_jev_client_falls_back_end_to_end_without_api_key(monkeypatch
     _, d = await dec.direction(make_state())
     assert d.source == "fallback"
     await dec.jev.aclose()
+
+
+async def test_pick_character_samples_but_never_below_sample_floor():
+    opts = [
+        {"index": 0, "id": "A", "name": "A"},
+        {"index": 1, "id": "B", "name": "B"},
+        {"index": 2, "id": "C", "name": "C"},
+    ]
+    fake = FakeJev(script={"character": ("A", {"A": 0.6, "B": 0.39, "C": 0.01}, 0.9)})
+    dec = decide.Decider(fake, TH, rng=random.Random(1234))
+    seen = set()
+    for _ in range(300):
+        decision = await dec.pick("character", opts)
+        assert decision.choice in {"A", "B", "C"}   # always a valid option
+        assert decision.source == "jev"
+        assert decision.sampled is True
+        seen.add(decision.choice)
+    assert "C" not in seen   # C's 1% probability is below SAMPLE_FLOOR (5%) and is never chosen
+    assert seen.issubset({"A", "B"})
+
+
+async def test_pick_level_up_always_returns_jevs_top_answer():
+    opts = [
+        {"index": 0, "id": "WHIP", "name": "Whip", "kind": "weapon", "level": 5},
+        {"index": 1, "id": "SPINACH", "name": "Spinach", "kind": "passive", "level": 2},
+    ]
+    fake = FakeJev(script={"level_up": ("SPINACH", {"SPINACH": 0.55, "WHIP": 0.45}, 0.6)})
+    dec = decide.Decider(fake, TH, rng=random.Random(0))
+    for _ in range(20):
+        decision = await dec.pick("level_up", opts, {"weapons": [], "passives": []})
+        assert decision.choice == "SPINACH"
+        assert decision.sampled is False
 
 
 async def test_fallback_warnings_are_rate_limited(caplog):

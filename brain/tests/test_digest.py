@@ -90,3 +90,83 @@ def test_to_dict_is_json_ready(empty_state):
     import json
     d = digest.digest_state(empty_state, TH)
     json.dumps(d.to_dict())
+
+
+# ----------------------------------------------------------------- xp awareness
+
+@pytest.mark.parametrize("xp,xp_to_next,expected", [
+    (0, 0, "just levelled"),
+    (5, 0, "just levelled"),           # guard: xp_to_next <= 0
+    (0, 50, "just levelled"),
+    (12, 50, "just levelled"),         # 0.24 < xp_partway(0.25)
+    (12.5, 50, "partway to the next level"),  # 0.25 boundary
+    (29, 50, "partway to the next level"),    # 0.58 < xp_close(0.6)
+    (30, 50, "close to the next level"),      # 0.6 boundary
+    (44, 50, "close to the next level"),      # 0.88 < xp_imminent(0.9)
+    (45, 50, "a level up is imminent"),       # 0.9 boundary
+    (50, 50, "a level up is imminent"),
+])
+def test_xp_bucket_boundaries(xp, xp_to_next, expected):
+    assert digest.xp_bucket(xp, xp_to_next, TH) == expected
+
+
+def test_player_summary_carries_xp_bucket():
+    st = make_state()
+    st["player"]["xp"] = 45
+    st["player"]["xp_to_next"] = 50
+    d = digest.digest_state(st, TH)
+    assert d.player.xp_bucket == "a level up is imminent"
+
+
+# ----------------------------------------------------------------- objective awareness
+
+def test_sector_with_two_pickups_lists_both_categories_sorted_and_deduped():
+    st = make_state(pickups=[
+        {"x": 2, "y": 2, "kind": "TREASURE"},
+        {"x": 2.1, "y": 2.1, "kind": "COIN"},
+        {"x": 2.2, "y": 2.2, "kind": "COINBAG1"},
+    ])
+    d = digest.digest_state(st, TH)
+    ne = d.sectors["north_east"]
+    assert ne.objects == ["chest", "coins"]
+    assert ne.chest is True
+
+
+def test_unknown_pickup_kind_is_item_category():
+    st = make_state(pickups=[{"x": 2, "y": 2, "kind": "MYSTERY_THING"}])
+    d = digest.digest_state(st, TH)
+    assert d.sectors["north_east"].objects == ["item"]
+
+
+# ----------------------------------------------------------------- obstacle awareness
+
+def test_blocked_when_applied_direction_matches_and_barely_moved():
+    st = make_state()
+    st["player"]["applied_direction"] = "north"
+    st["player"]["moved"] = 0.01
+    d = digest.digest_state(st, TH)
+    assert d.sectors["north"].blocked is True
+    assert d.sectors["south"].blocked is False
+
+
+def test_not_blocked_when_moved_past_threshold():
+    st = make_state()
+    st["player"]["applied_direction"] = "north"
+    st["player"]["moved"] = 1.0
+    d = digest.digest_state(st, TH)
+    assert d.sectors["north"].blocked is False
+
+
+def test_not_blocked_when_applied_direction_is_stay():
+    st = make_state()
+    st["player"]["applied_direction"] = "stay"
+    st["player"]["moved"] = 0.0
+    d = digest.digest_state(st, TH)
+    assert all(not s.blocked for s in d.sectors.values())
+
+
+def test_not_blocked_when_applied_direction_missing():
+    st = make_state()
+    st["player"]["moved"] = 0.0
+    d = digest.digest_state(st, TH)
+    assert all(not s.blocked for s in d.sectors.values())

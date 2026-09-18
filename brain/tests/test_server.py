@@ -94,14 +94,16 @@ async def test_stop_cancels_in_flight_tasks(tmp_path):
 
 
 async def test_events_drive_run_log_and_picks(tmp_path):
-    jev = FakeJev(script={"character": ("IMELDA", {"IMELDA": 0.9, "ANTONIO": 0.1}, 0.8),
+    # ANTONIO's 1% is below SAMPLE_FLOOR (5%), so the character-select sampling step
+    # (see Decider.pick / decide.SAMPLE_FLOOR) deterministically keeps only IMELDA.
+    jev = FakeJev(script={"character": ("IMELDA", {"IMELDA": 0.99, "ANTONIO": 0.01}, 0.8),
                          "level_up": ("SPINACH", {"SPINACH": 1.0}, 1.0)})
     srv, hub, stats, reader, writer = await _start(tmp_path, jev)
     chars = [{"id": "ANTONIO", "name": "Antonio", "description": "d"}, {"id": "IMELDA", "name": "Imelda", "description": "d"}]
     await _send(writer, {"id": 10, "type": "event", "event": "character_select", "options": chars})
     r = await _recv(reader)
     assert r == {"id": 10, "type": "pick", "index": 1, "choice": "IMELDA",
-                 "probabilities": {"IMELDA": 0.9, "ANTONIO": 0.1}, "confidence": 0.8, "source": "jev"}
+                 "probabilities": {"IMELDA": 0.99, "ANTONIO": 0.01}, "confidence": 0.8, "source": "jev"}
     assert srv.runlog.active is True
     await _send(writer, {"id": 11, "type": "event", "event": "stage_select",
                          "options": [{"id": "FOREST", "name": "Mad Forest", "description": "d"}]})

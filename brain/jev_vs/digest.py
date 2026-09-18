@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 from dataclasses import asdict, dataclass, field
 
-from .questions import Thresholds
+from .questions import Thresholds, pickup_category
 
 SECTORS: list[str] = [
     "north", "north_east", "east", "south_east", "south", "south_west", "west", "north_west",
@@ -16,7 +16,6 @@ SECTORS: list[str] = [
 
 _DISTANCE_WEIGHT = {"touching": 4.0, "close": 2.0, "mid": 1.0, "far": 0.5}
 _DISTANCE_ORDER = ["touching", "close", "mid", "far"]
-_CHEST_WORDS = ("TREASURE", "CHEST")
 
 
 def sector_of(dx: float, dy: float) -> str:
@@ -65,16 +64,35 @@ def hp_bucket(hp: float, max_hp: float, th: Thresholds) -> str:
     return "full"
 
 
+def xp_bucket(xp: float, xp_to_next: float, th: Thresholds) -> str:
+    if xp_to_next <= 0:
+        return "just levelled"
+    frac = xp / xp_to_next
+    if frac < th.xp_partway:
+        return "just levelled"
+    if frac < th.xp_close:
+        return "partway to the next level"
+    if frac < th.xp_imminent:
+        return "close to the next level"
+    return "a level up is imminent"
+
+
 @dataclass
 class SectorSummary:
     pressure: str = "none"
     nearest: str | None = None
     gems: str = "none"
     boss: bool = False
-    chest: bool = False
+    objects: list[str] = field(default_factory=list)
+    blocked: bool = False
     enemy_count: int = 0
     gem_count: int = 0
     weight: float = 0.0
+
+    @property
+    def chest(self) -> bool:
+        """Kept for anything that still expects the old boolean flag; derived from objects."""
+        return "chest" in self.objects
 
 
 @dataclass
@@ -84,6 +102,7 @@ class PlayerSummary:
     max_hp: float
     level: int
     minute: int
+    xp_bucket: str = "just levelled"
     weapons: list[str] = field(default_factory=list)
     passives: list[str] = field(default_factory=list)
 
@@ -121,13 +140,18 @@ def digest_state(state: dict, th: Thresholds) -> Digest:
         sectors[sector_of(float(g.get("x", 0.0)), float(g.get("y", 0.0)))].gem_count += 1
 
     for pk in state.get("pickups", []):
-        kind = str(pk.get("kind", "")).upper()
-        if any(w in kind for w in _CHEST_WORDS):
-            sectors[sector_of(float(pk.get("x", 0.0)), float(pk.get("y", 0.0)))].chest = True
+        category = pickup_category(pk.get("kind", ""))
+        sectors[sector_of(float(pk.get("x", 0.0)), float(pk.get("y", 0.0)))].objects.append(category)
+
+    applied_direction = p.get("applied_direction")
+    moved = p.get("moved")
+    if applied_direction in SECTORS and moved is not None and float(moved) < th.blocked_move:
+        sectors[applied_direction].blocked = True
 
     for s in sectors.values():
         s.pressure = pressure_bucket(s.weight, th)
         s.gems = gems_bucket(s.gem_count, th)
+        s.objects = sorted(set(s.objects))
 
     player = PlayerSummary(
         hp_bucket=hp_bucket(float(p.get("hp", 0.0)), float(p.get("max_hp", 0.0)), th),
@@ -135,6 +159,7 @@ def digest_state(state: dict, th: Thresholds) -> Digest:
         max_hp=float(p.get("max_hp", 0.0)),
         level=int(p.get("level", 0)),
         minute=int(p.get("minute", 0)),
+        xp_bucket=xp_bucket(float(p.get("xp", 0.0)), float(p.get("xp_to_next", 0.0)), th),
         weapons=_equip_words(p.get("weapons", [])),
         passives=_equip_words(p.get("passives", [])),
     )

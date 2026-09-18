@@ -33,6 +33,10 @@ class Thresholds:
     hp_critical: float = 0.25
     hp_low: float = 0.5
     hp_ok: float = 0.9
+    xp_partway: float = 0.25
+    xp_close: float = 0.6
+    xp_imminent: float = 0.9
+    blocked_move: float = 0.05
 
 
 DEFAULT_THRESHOLDS = Thresholds()
@@ -53,17 +57,62 @@ DIRECTION_VECTORS: dict[str, tuple[float, float]] = {
 DIRECTION_INSTRUCTIONS = (
     "You steer the survivor in a top-down arena. Each option is a direction to walk for the next "
     "quarter second, described by what lies that way. Walk away from heavy or touching enemy pressure "
-    "and never walk into it. When the player's hp is critical or low, choose safety over gems. "
+    "and never walk into it. Never choose a direction described as blocked; pick another way around, "
+    "since the survivor cannot actually move that way. "
+    "When the player's hp is critical or low, choose safety over gems and never detour for anything; "
+    "when hp is low, prefer healing above everything else. "
     "When hp is ok or full, prefer the direction with gems as long as its pressure is none or light. "
+    "When a level up is imminent or close and hp is ok or full, prefer a direction with gems even at "
+    "light pressure; leveling up is how the survivor gets stronger. "
+    "Survive first, and detour only when it is safe to do so: go for chests, coffin unlocks and relics "
+    "only when that direction's pressure is none or light. Coins are the lowest priority and are never "
+    "worth a detour into danger. "
     "Prefer chests and avoid bosses unless hp is full. Choose stay only when every direction is worse than standing still."
 )
 
 
+# Pickup kind (as the game reports it) -> word category Jev is shown.
+PICKUP_CATEGORIES: dict[str, str] = {
+    "TREASURE": "chest", "STATS_TREASURE_1": "chest", "STATS_TREASURE_2": "chest", "STATS_TREASURE_3": "chest",
+    "COFFIN": "unlock", "COFFINX": "unlock", "COFFIN_EMPTY": "unlock",
+    "MOONGATE": "relic", "MERCHANT": "relic", "DIRECTER": "relic", "EGGMAN": "relic", "COSMO_PAVONE": "relic",
+    "ROAST": "healing", "ALWAYS_ROAST": "healing", "LITTLEHEART": "healing", "HEALER": "healing",
+    "PURIFY": "healing", "PURIFY2": "healing",
+    "VACUUM": "power", "ROSARY": "power", "ROSARYX": "power", "OROLOGION": "power", "CLOVER": "power", "GILDED": "power",
+    "COIN": "coins", "COINBAG1": "coins", "COINBAG2": "coins", "COINBAGMAX": "coins", "ALWAYS_COINBAG2": "coins", "NFT": "coins",
+}
+
+_OBJECT_TEXT: dict[str, str] = {
+    "chest": "a chest is here",
+    "unlock": "a coffin unlock is here",
+    "relic": "a relic is here",
+    "healing": "healing is here",
+    "power": "a power-up is here",
+    "coins": "coins are here",
+    "item": "an item is here",
+}
+
+
+def pickup_category(kind: str) -> str:
+    """Word category for a pickup's kind. Unknown or empty kinds, and anything else, are just 'item'."""
+    k = str(kind or "").strip().upper()
+    if not k:
+        return "item"
+    if k in PICKUP_CATEGORIES:
+        return PICKUP_CATEGORIES[k]
+    if k.startswith("RELIC"):
+        return "relic"
+    return "item"
+
+
 def sector_text(s: SectorSummary) -> str:
     """Words only. Never a digit."""
-    if s.enemy_count == 0 and s.gem_count == 0 and not s.chest and not s.boss:
-        return "no enemies, no gems"
     parts: list[str] = []
+    if s.blocked:
+        parts.append("blocked, you are not moving that way")
+    if s.enemy_count == 0 and s.gem_count == 0 and not s.objects and not s.boss:
+        parts.append("no enemies, no gems")
+        return ", ".join(parts)
     if s.enemy_count == 0:
         parts.append("no enemies")
     else:
@@ -71,8 +120,8 @@ def sector_text(s: SectorSummary) -> str:
     parts.append("no gems" if s.gems == "none" else f"{s.gems} gems")
     if s.boss:
         parts.append("a boss is here")
-    if s.chest:
-        parts.append("a chest is here")
+    for category in s.objects:
+        parts.append(_OBJECT_TEXT.get(category, "an item is here"))
     return ", ".join(parts)
 
 
@@ -93,6 +142,7 @@ def direction_question(d: Digest) -> Ask:
     state = {
         "player": {
             "hp": d.player.hp_bucket,
+            "level_progress": d.player.xp_bucket,
             "minute_of_run": _minute_words(d.player.minute),
             "weapons": d.player.weapons,
             "passives": d.player.passives,
@@ -144,6 +194,13 @@ _PICK_INSTRUCTIONS = {
     "stage": STAGE_INSTRUCTIONS,
 }
 
+# Kinds where the run history is fed back in, so the same pick isn't made every time.
+_VARIETY_KINDS = ("character", "stage")
+VARIETY_INSTRUCTIONS = (
+    " The recently_played list shows what was picked in recent runs, most recent first. Prefer an "
+    "option that does not appear in recently_played; only repeat one when every option was played recently."
+)
+
 
 def _option_description(kind: str, o: dict) -> str:
     bits: list[str] = [str(o.get("name", o.get("id", "?")))]
@@ -170,7 +227,7 @@ def _build_item_text(item) -> str:
     return str(item)
 
 
-def options_question(kind: str, options: list[dict], build: dict | None) -> Ask:
+def options_question(kind: str, options: list[dict], build: dict | None, recent: list[str] | None = None) -> Ask:
     if kind not in _PICK_INSTRUCTIONS:
         raise ValueError(f"unknown pick kind {kind!r}")
     keys: list[str] = []
@@ -190,6 +247,9 @@ def options_question(kind: str, options: list[dict], build: dict | None) -> Ask:
             "run_phase": _minute_words(int(build.get("minute", 0))),
         }
     instructions = _PICK_INSTRUCTIONS[kind]
+    if kind in _VARIETY_KINDS and recent:
+        state["recently_played"] = list(recent)
+        instructions = instructions + VARIETY_INSTRUCTIONS
     return Ask(
         name=kind,
         state=state,

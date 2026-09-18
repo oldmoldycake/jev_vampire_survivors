@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import time
 from dataclasses import dataclass, field
 
@@ -14,6 +15,11 @@ _PRESSURE_RANK = {"none": 0, "light": 1, "moderate": 2, "heavy": 3}
 _GEM_RANK = {"none": 0, "few": 1, "many": 2}
 
 WARN_INTERVAL_S = 60.0  # rate limit for fallback-failure warnings; see Decider._log_failure
+
+# character and stage picks are sampled (not always Jev's top answer) so a human doesn't see the
+# same character and stage every run; options below this probability are never sampled.
+SAMPLE_FLOOR = 0.05
+_VARIETY_KINDS = ("character", "stage")
 
 
 @dataclass
@@ -28,6 +34,7 @@ class Decision:
     input_tokens: int = 0
     instructions: str = ""
     labels: dict[str, str] = field(default_factory=dict)
+    sampled: bool = False             # True when the choice came from the variety sampler, not Jev's raw top answer
 
     def to_dict(self) -> dict:
         return {
@@ -35,6 +42,7 @@ class Decision:
             "probabilities": self.probabilities, "confidence": self.confidence,
             "latency_ms": round(self.latency_ms, 1), "source": self.source,
             "input_tokens": self.input_tokens, "instructions": self.instructions, "labels": self.labels,
+            "sampled": self.sampled,
         }
 
 
@@ -57,9 +65,10 @@ def fallback_pick(options: list[dict]) -> int:
 
 
 class Decider:
-    def __init__(self, jev, thresholds: Thresholds):
+    def __init__(self, jev, thresholds: Thresholds, rng: random.Random | None = None):
         self._jev = jev
         self._th = thresholds
+        self._rng = rng if rng is not None else random.Random()
         self._failures_since_warn = 0
         self._last_warned = 0.0
 
@@ -106,18 +115,39 @@ class Decider:
             instructions=ask.instructions, labels=ask.labels,
         )
 
-    async def pick(self, kind: str, options: list[dict], build: dict | None = None) -> Decision:
+    def _sample_choice(self, probs: dict[str, float], keys: list[str]) -> str | None:
+        """Drop options below SAMPLE_FLOOR, renormalise, and sample one; None if nothing survives."""
+        candidates = [(k, probs.get(k, 0.0)) for k in keys if probs.get(k, 0.0) >= SAMPLE_FLOOR]
+        total = sum(p for _, p in candidates)
+        if not candidates or total <= 0:
+            return None
+        r = self._rng.random() * total
+        upto = 0.0
+        for k, p in candidates:
+            upto += p
+            if r <= upto:
+                return k
+        return candidates[-1][0]   # floating-point rounding fallback
+
+    async def pick(self, kind: str, options: list[dict], build: dict | None = None,
+                    recent: list[str] | None = None) -> Decision:
         if not options:
             raise ValueError(f"{kind}: no options to pick from")
-        ask = options_question(kind, options, build)
+        ask = options_question(kind, options, build, recent=recent)
         choice, probs, conf, latency, tokens = await self._ask(ask)
         source = "jev"
+        sampled = False
         if choice is None:
             idx = fallback_pick(options)
             choice, conf, source = ask.keys[idx], 0.0, "fallback"
             probs = {k: (1.0 if k == choice else 0.0) for k in ask.keys}
+        elif kind in _VARIETY_KINDS:
+            sampled = True
+            picked = self._sample_choice(probs, ask.keys)
+            if picked is not None:
+                choice = picked
         return Decision(
             kind=kind, choice=choice, index=ask.keys.index(choice), probabilities=probs,
             confidence=conf, latency_ms=latency, source=source, input_tokens=tokens,
-            instructions=ask.instructions, labels=ask.labels,
+            instructions=ask.instructions, labels=ask.labels, sampled=sampled,
         )

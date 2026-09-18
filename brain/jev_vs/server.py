@@ -16,6 +16,19 @@ log = logging.getLogger(__name__)
 
 PICK_EVENTS = {"character_select": "character", "stage_select": "stage", "level_up": "level_up",
                "weapon_select": "weapon_select", "arcana_select": "arcana_select"}
+RECENT_HISTORY_LIMIT = 5
+
+
+def _recent_values(history: list[dict], key: str, limit: int = RECENT_HISTORY_LIMIT) -> list[str]:
+    """Last `limit` non-empty values of `key` from finished-run summaries, most recent first."""
+    out: list[str] = []
+    for run in reversed(history):
+        value = run.get(key)
+        if value:
+            out.append(value)
+            if len(out) >= limit:
+                break
+    return out
 
 
 class PluginServer:
@@ -199,7 +212,8 @@ class PluginServer:
             self.runlog.start_run({})
             self.current_run = {"started_at": time.time()}
             self.hub.publish({"type": "run", "phase": "start", "meta": self.current_run})
-        decision = await self.decider.pick(kind, options, msg.get("build"))
+        recent = _recent_values(self.run_history, kind) if kind in ("character", "stage") else None
+        decision = await self.decider.pick(kind, options, msg.get("build"), recent=recent)
         chosen = options[decision.index]
         reply_index = chosen.get("index", decision.index)
         await self._reply(writer, protocol.pick_reply(mid, reply_index, decision.choice, decision.probabilities,

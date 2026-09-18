@@ -34,6 +34,7 @@
   #log div { border-bottom:1px dashed var(--line); padding:2px 0; }
   #runs td, #runs th { padding:2px 6px; text-align:left; color:var(--dim); } #runs th { color:var(--ink); }
   .src-fallback { color:var(--warn); } .src-reused { color:var(--dim); }
+  .sampled { color:var(--hot); }
 </style>
 </head>
 <body>
@@ -96,7 +97,7 @@
       return `<div class="row ${k === d.choice ? "win" : ""}"><span title="${label}">${label.slice(0, 18)}</span><div class="bar"><i style="width:${(p * 100).toFixed(1)}%"></i></div><span>${p.toFixed(2)}</span></div>`;
     }).join("");
     el.innerHTML = `<span class="tag">${d.kind.toUpperCase()}</span><span class="q">${(d.instructions || "").slice(0, 220)}</span>${rows}
-      <div class="meta">conf ${(d.confidence || 0).toFixed(2)} · ${d.latency_ms || 0}ms · <span class="src-${d.source}">${d.source}</span></div>`;
+      <div class="meta">conf ${(d.confidence || 0).toFixed(2)} · ${d.latency_ms || 0}ms · <span class="src-${d.source}">${d.source}</span>${d.sampled ? ' · <span class="sampled">sampled</span>' : ''}</div>`;
     if (d.kind === "direction") renderRadar(d);
   }
 
@@ -118,6 +119,7 @@
       ctx.fillStyle = `rgba(255,92,92,${PRESSURE_ALPHA[s.pressure] || 0})`; ctx.fill();
       ctx.strokeStyle = "#1d3a25"; ctx.stroke();
       if (s.gems && s.gems !== "none") { ctx.fillStyle = "rgba(57,255,122,0.12)"; ctx.fill(); }
+      if (s.blocked) { ctx.strokeStyle = "#ffb347"; ctx.lineWidth = 3; ctx.stroke(); ctx.lineWidth = 1; }
     });
     const ent = d.entities || {}, half = (ent.screen && ent.screen.half_h) || 1;
     const scale = R / (half * 1.6);
