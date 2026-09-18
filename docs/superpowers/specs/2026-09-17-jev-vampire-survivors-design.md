@@ -1,7 +1,8 @@
 # Jev plays Vampire Survivors: design
 
 Date: 2026-09-17
-Status: approved in brainstorming, pending written review
+Status: implemented in v0.1.0 — see docs/superpowers/ledgers/ for what was verified live,
+and the README's Known limitations for what was not.
 
 ## 1. Goal
 

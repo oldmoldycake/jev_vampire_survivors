@@ -7,7 +7,7 @@ LOG="$GAME_DIR/BepInEx/LogOutput.log"
 game_pids() { for p in /proc/[0-9]*; do [ "$(readlink "$p/exe" 2>/dev/null)" = "$EXE" ] && basename "$p" || true; done; }
 case "${1:-}" in
   launch) rm -f "$LOG"; (steam "steam://rungameid/1794680" >/dev/null 2>&1 &); echo "launch requested";;
-  wait-log) pat="$2"; t="${3:-120}"; end=$(( $(date +%s) + t ))
+  wait-log) pat="${2:?usage: $0 wait-log PATTERN [TIMEOUT]}"; t="${3:-120}"; end=$(( $(date +%s) + t ))
     while [ "$(date +%s)" -lt "$end" ]; do
       if [ -f "$LOG" ] && grep -q -E "$pat" "$LOG"; then echo "matched: $pat"; exit 0; fi
       sleep 2

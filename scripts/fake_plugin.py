@@ -2,7 +2,7 @@
 """Pretend to be the game plugin. Usage:
 
   uv run --project brain python scripts/fake_plugin.py --ticks 20 --hz 4
-  uv run --project brain python scripts/fake_plugin.py --replay runs/20260917-220000
+  uv run --project brain python scripts/fake_plugin.py --replay brain/runs/20260917-220000
 
 Prints each reply. Needs a running brain (uv run --project brain jev-vs).
 """

@@ -10,6 +10,7 @@ host = "127.0.0.1"
 port = 48232
 
 [brain]
+# Not read at runtime: the plugin drives the tick cadence (TickHz in its BepInEx config).
 tick_hz = 4.0
 model = "jev-latest"
 request_timeout_s = 0.8
