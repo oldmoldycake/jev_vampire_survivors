@@ -27,7 +27,7 @@ namespace JevSurvivors
         /// <summary>Pages with a dedicated handler; the safety net leaves these alone.</summary>
         private static readonly HashSet<Type> Handled = new HashSet<Type>
         {
-            typeof(MainMenuPage), typeof(CharacterSelectionPage), typeof(WeaponSelectionPage),
+            typeof(WarningPage), typeof(MainMenuPage), typeof(CharacterSelectionPage), typeof(WeaponSelectionPage),
             typeof(StageSelectPage), typeof(MainGamePage),
         };
 
@@ -102,6 +102,19 @@ namespace JevSurvivors
         private bool RunBudgetLeft() => Plugin.MaxRuns.Value <= 0 || RunsStarted < Plugin.MaxRuns.Value;
 
         // ------------------------------------------------------------------ boot to run start
+        public void OnWarning(WarningPage page) => _plugin.StartCoroutine(Warning(page));
+
+        private IEnumerator Warning(WarningPage page)
+        {
+            float deadline = Time.realtimeSinceStartup + 10f;
+            while (page != null && page._isWaiting && page._currentTime <= page.WaitDuration && Time.realtimeSinceStartup < deadline)
+                yield return null;
+            yield return new WaitForSecondsRealtime(Plugin.MenuDelayS.Value);
+            if (!CanAutomate() || page == null || !page._isWaiting) yield break;
+            Plugin.Log.LogInfo("warning page: continuing");
+            page.Complete();
+        }
+
         public void OnLanding(LandingScreenPage page) => _plugin.StartCoroutine(Landing(page));
 
         private IEnumerator Landing(LandingScreenPage page)

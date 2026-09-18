@@ -36,6 +36,12 @@ namespace JevSurvivors
         private static void Postfix(LandingScreenPage __instance) => Safe.Run("OnLanding", () => MenuDriver.Instance?.OnLanding(__instance));
     }
 
+    [HarmonyPatch(typeof(WarningPage), "OnShowStart")]
+    internal static class WarningPatch
+    {
+        private static void Postfix(WarningPage __instance) => Safe.Run("OnWarning", () => MenuDriver.Instance?.OnWarning(__instance));
+    }
+
     [HarmonyPatch(typeof(MainMenuPage), "OnShowStart")]
     internal static class MainMenuPatch
     {
