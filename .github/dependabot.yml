@@ -1,0 +1,66 @@
+# Dependabot keeps the three dependency surfaces of this repo current.
+# https://docs.github.com/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+version: 2
+
+updates:
+  # 1. The actions used by .github/workflows/*.yml.
+  #    Every `uses:` is pinned to a full commit SHA, so Dependabot is what moves
+  #    those pins -- it rewrites both the SHA and the trailing "# vX.Y.Z"
+  #    comment. Directory is always "/" for this ecosystem.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    groups:
+      # One PR a week for the routine bumps; majors still arrive alone so the
+      # breaking change gets read.
+      actions-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # 2. The Python brain (brain/pyproject.toml + the committed brain/uv.lock).
+  #    "uv" is the package-ecosystem identifier for uv projects; it updates the
+  #    lockfile, which is what CI installs with `uv sync --locked`.
+  - package-ecosystem: uv
+    directory: /brain
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+      prefix-development: deps-dev
+      include: scope
+    groups:
+      python-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # 3. The BepInEx plugin's NuGet packages (currently just
+  #    BepInEx.AssemblyPublicizer.MSBuild). CI cannot build mod/ -- see the
+  #    comment at the top of .github/workflows/ci.yml -- so these PRs arrive
+  #    unverified: rebuild locally with scripts/deploy_mod.sh and smoke-run the
+  #    game before merging one.
+  - package-ecosystem: nuget
+    directory: /mod/JevSurvivors
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: deps
+      include: scope
+    groups:
+      nuget-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]

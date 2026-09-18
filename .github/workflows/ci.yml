@@ -1,0 +1,78 @@
+name: CI
+
+# Why there is no C# / dotnet job here
+# -----------------------------------
+# mod/ is a BepInEx plugin that compiles against the shipped game's proprietary
+# Managed assemblies (VampireSurvivors.Runtime.dll, PauseSystem.dll, Zenject.dll,
+# UnityEngine*.dll, ...) read straight out of a local Steam install. Those DLLs
+# cannot legally be redistributed or downloaded onto a CI runner, and swapping in
+# stub assemblies would only prove that the stubs compile -- not that the plugin
+# binds to the real game types. So the plugin is verified locally instead:
+# `scripts/deploy_mod.sh` builds and installs it, followed by a manual smoke run
+# against the real game (see CONTRIBUTING.md). This workflow covers brain/ only.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege: nothing here publishes, releases, or needs a secret.
+permissions:
+  contents: read
+
+# One run per ref; a new push supersedes the one still in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  brain:
+    name: brain (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      # Report every version's result rather than cancelling siblings.
+      fail-fast: false
+      matrix:
+        # jev-vs declares requires-python = ">=3.12", so 3.12 is the only
+        # supported version today. Add entries here to widen the matrix --
+        # nothing else in this job needs to change.
+        python-version: ["3.12"]
+    defaults:
+      run:
+        working-directory: brain
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          # Paths are relative to the workspace root, not the job's
+          # working-directory, so this is brain/uv.lock.
+          cache-dependency-glob: brain/uv.lock
+
+      - name: Install locked dependencies
+        id: install
+        # --locked fails loudly if brain/uv.lock has drifted from
+        # brain/pyproject.toml instead of silently resolving something new.
+        run: uv sync --locked --all-groups
+
+      - name: Lint (ruff check)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: uv run ruff check .
+
+      - name: Format (ruff format --check)
+        # Runs even when the lint step failed, so a contributor sees every
+        # problem in one run instead of fixing them one push at a time.
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: uv run ruff format --check .
+
+      - name: Tests (pytest)
+        # brain/pyproject.toml sets addopts = "-m 'not live'", so the `live`
+        # tests -- which bill a real TypeSafe API key -- never run here. CI has
+        # no TYPESAFE_API_KEY and must not get one.
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: uv run pytest

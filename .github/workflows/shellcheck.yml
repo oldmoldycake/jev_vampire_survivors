@@ -1,0 +1,42 @@
+name: Shellcheck
+
+# The four helper scripts in scripts/ are the documented way to install BepInEx,
+# build and deploy the plugin, and drive the game during verification. They are
+# not exercised by any test, so a static pass is the only automated check they
+# get. ShellCheck ships preinstalled on the ubuntu-latest runner image, so this
+# needs no third-party action.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shellcheck:
+    name: scripts/*.sh
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Report the ShellCheck version in use
+        run: shellcheck --version
+
+      - name: ShellCheck scripts/*.sh
+        # --severity=warning gates on warnings and errors (real bugs) and lets
+        # info/style notes through. scripts/game_ctl.sh trips two info-level
+        # checks on purpose: SC2086 on `kill $pids`, where the unquoted split of
+        # a PID list is the point, and SC2015 on an `A && B || C` used as a
+        # deliberate "print this or nothing". Neither is worth a code change, and
+        # the fix belongs in the script as a `# shellcheck disable=` directive,
+        # not as a repo-wide exclusion here. Tighten this to --severity=style
+        # once those two lines carry directives.
+        run: shellcheck --severity=warning scripts/*.sh
