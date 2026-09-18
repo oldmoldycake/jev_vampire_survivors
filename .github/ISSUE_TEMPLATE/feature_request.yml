@@ -7,7 +7,7 @@ body:
       value: |
         This is a small project with an opinionated shape, so the most useful thing you can do
         here is say what you want it to *do* — the design doc in
-        [`docs/superpowers/specs/`](https://github.com/OldMoldyCake/jev_vampire_survivors/tree/main/docs/superpowers/specs)
+        [`docs/superpowers/specs/`](https://github.com/oldmoldycake/jev_vampire_survivors/tree/main/docs/superpowers/specs)
         explains the constraints any implementation has to work within.
 
   - type: textarea
@@ -65,5 +65,5 @@ body:
       options:
         - label: I'd be up for implementing this myself, with a pointer or two.
           required: false
-        - label: I agree to follow this project's [Code of Conduct](https://github.com/OldMoldyCake/jev_vampire_survivors/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to follow this project's [Code of Conduct](https://github.com/oldmoldycake/jev_vampire_survivors/blob/main/CODE_OF_CONDUCT.md).
           required: true

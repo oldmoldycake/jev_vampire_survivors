@@ -10,7 +10,7 @@ actually is a vulnerability.
 
 Use GitHub's private vulnerability reporting: the repository's **Security** tab →
 **Report a vulnerability**, or go straight to
-<https://github.com/OldMoldyCake/jev_vampire_survivors/security/advisories/new>. The report
+<https://github.com/oldmoldycake/jev_vampire_survivors/security/advisories/new>. The report
 stays private to the maintainer until there's a fix.
 
 <!-- MAINTAINER: that link 404s until you turn the feature on. Repository Settings → Advanced

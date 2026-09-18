@@ -101,5 +101,5 @@ Treasure chests, a full 30-minute stage clear, the revive path and the F9 pause 
 verified by code review rather than by a live run that happened to exercise them. See
 [Known limitations](README.md#known-limitations) in the README for the current list.
 
-[Unreleased]: https://github.com/OldMoldyCake/jev_vampire_survivors/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/OldMoldyCake/jev_vampire_survivors/releases/tag/v0.1.0
+[Unreleased]: https://github.com/oldmoldycake/jev_vampire_survivors/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/oldmoldycake/jev_vampire_survivors/releases/tag/v0.1.0

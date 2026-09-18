@@ -42,7 +42,7 @@ This Code of Conduct applies within all community spaces, and also applies when 
      do not substitute a personal inbox. Note that the security-advisory link only works once
      "Private vulnerability reporting" is enabled for this repository (see SECURITY.md). -->
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement through GitHub: either by opening a [private report](https://github.com/OldMoldyCake/jev_vampire_survivors/security/advisories/new) via the repository's Security tab, which is visible only to the maintainer, or by contacting the maintainer [@OldMoldyCake](https://github.com/OldMoldyCake) directly on GitHub. All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement through GitHub: either by opening a [private report](https://github.com/oldmoldycake/jev_vampire_survivors/security/advisories/new) via the repository's Security tab, which is visible only to the maintainer, or by contacting the maintainer [@OldMoldyCake](https://github.com/oldmoldycake) directly on GitHub. All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the reporter of any incident.
 

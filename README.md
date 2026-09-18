@@ -1,6 +1,6 @@
 # Jev plays Vampire Survivors
 
-[![CI](https://img.shields.io/github/actions/workflow/status/OldMoldyCake/jev_vampire_survivors/ci.yml?branch=main&label=CI)](https://github.com/OldMoldyCake/jev_vampire_survivors/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/OldMoldyCake/jev_vampire_survivors/ci.yml?branch=main&label=CI)](https://github.com/oldmoldycake/jev_vampire_survivors/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-lightgrey)](#platform-support)

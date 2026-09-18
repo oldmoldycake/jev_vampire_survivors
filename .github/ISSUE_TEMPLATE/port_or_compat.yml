@@ -91,5 +91,5 @@ body:
       options:
         - label: I removed my TypeSafe API key and anything else private from the output above.
           required: true
-        - label: I agree to follow this project's [Code of Conduct](https://github.com/OldMoldyCake/jev_vampire_survivors/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to follow this project's [Code of Conduct](https://github.com/oldmoldycake/jev_vampire_survivors/blob/main/CODE_OF_CONDUCT.md).
           required: true

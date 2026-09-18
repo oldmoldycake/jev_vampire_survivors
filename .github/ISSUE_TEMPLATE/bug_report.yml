@@ -9,7 +9,7 @@ body:
 
         - **This is Linux-only.** Native Linux Steam builds of Vampire Survivors, no Proton
           prefix. Windows and macOS aren't supported as shipped — see
-          [Platform support](https://github.com/OldMoldyCake/jev_vampire_survivors#platform-support).
+          [Platform support](https://github.com/oldmoldycake/jev_vampire_survivors#platform-support).
           If you're porting, or a game update broke something that used to work, use the
           **Game update or port** template instead.
         - **Scrub your logs.** The last field on this form is a promise that you did.
@@ -130,5 +130,5 @@ body:
           required: true
         - label: I'm on current `main`, or I said which commit I'm on.
           required: false
-        - label: I agree to follow this project's [Code of Conduct](https://github.com/OldMoldyCake/jev_vampire_survivors/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to follow this project's [Code of Conduct](https://github.com/oldmoldycake/jev_vampire_survivors/blob/main/CODE_OF_CONDUCT.md).
           required: true

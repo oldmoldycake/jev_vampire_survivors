@@ -18,7 +18,7 @@ Details:
 
 ## Checklist
 
-- [ ] If this changes behavior that the README lists under [Known limitations](https://github.com/OldMoldyCake/jev_vampire_survivors#known-limitations) as unverified, I said how I verified it.
+- [ ] If this changes behavior that the README lists under [Known limitations](https://github.com/oldmoldycake/jev_vampire_survivors#known-limitations) as unverified, I said how I verified it.
 - [ ] Question wording and thresholds still live only in `brain/jev_vs/questions.py`.
 - [ ] Behavior changes in the brain come with tests under `brain/tests/`.
 - [ ] No API key, `.env` contents, or run-log dumps in the diff.
