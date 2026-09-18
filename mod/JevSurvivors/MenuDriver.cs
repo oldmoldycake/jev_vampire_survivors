@@ -458,7 +458,8 @@ namespace JevSurvivors
             if (!CanAutomate() || page == null) yield break;
             page.Reveal();
             yield return new WaitForSecondsRealtime(1.5f);
-            if (page != null) page.CollectCharacter();
+            if (!CanAutomate() || page == null || !page.gameObject.activeInHierarchy) yield break;
+            page.CollectCharacter();
         }
 
         private IEnumerator Dismiss(BaseUIPage page, Action action, string label)
@@ -474,6 +475,9 @@ namespace JevSurvivors
         private IEnumerator GameOver(GameOverPage page)
         {
             Movement.Clear();
+            RunsFinished++;
+            // Telemetry below is deliberately not gated by automation: a run that ended is counted and reported either way.
+            yield return new WaitForSecondsRealtime(2f);   // GameOverPage computes _stageComplete in OnIntroEnded ~1 s after showing
             var gm = GM.Core;
             var p = gm?.Player;
             var summary = new JObject
@@ -483,14 +487,13 @@ namespace JevSurvivors
                 ["seconds"] = gm != null ? Mathf.RoundToInt(gm.SurvivedSeconds) : 0,
                 ["level"] = p?.Level ?? 0,
                 ["kills"] = ReadKills(),
-                ["stage_complete"] = page._stageComplete,
+                ["stage_complete"] = page != null && page._stageComplete,
             };
-            RunsFinished++;
             Plugin.Log.LogInfo($"game over: {summary.ToString(Newtonsoft.Json.Formatting.None)}");
             if (_t.Connected)
                 _t.Request(new JObject { ["type"] = "event", ["event"] = "game_over", ["summary"] = summary }, 2f, _ => { }, () => { });
-            yield return new WaitForSecondsRealtime(2f);
-            if (!CanAutomate() || page == null) yield break;
+            yield return new WaitForSecondsRealtime(0.5f);
+            if (!CanAutomate() || page == null || !page.gameObject.activeInHierarchy) yield break;
             page.Quit();
         }
 
