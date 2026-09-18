@@ -36,7 +36,11 @@ async def test_index_serves_page(client):
     resp = await client.get("/")
     assert resp.status == 200
     body = await resp.text()
-    assert "<title>" in body and "judgments" in body.lower() and "WebSocket" in body
+    low = body.lower()
+    assert "<title>" in body and "WebSocket" in body
+    # the four panels the dashboard is made of, so a broken page fails here rather than silently
+    for panel in ("arena", "decisions", "log", "runs this session"):
+        assert panel in low, panel
 
 
 async def test_ws_snapshot_then_decision(client, plugin_server):
