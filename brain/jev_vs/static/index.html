@@ -3,150 +3,295 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Jev Survivors Ops</title>
+<title>Jev Survivors</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#050806; --panel:#0b120d; --line:#1d3a25; --ink:#b8f0c3; --dim:#5f8a68; --hot:#39ff7a; --warn:#ffb347; --bad:#ff5c5c; }
+  :root {
+    --void:#0a0710;      /* the dimmed arena behind a level-up panel */
+    --crypt:#150f1e;     /* panel field */
+    --gold:#d9a441;      /* the inlaid frame */
+    --gold-dim:#7a5a24;
+    --bone:#ede4d3;      /* pixel text */
+    --dim:#9a8f7d;
+    --blood:#c0392b;     /* health, enemies, danger */
+    --xp:#4fc3f7;        /* experience, gems */
+    --pixel:"Silkscreen", ui-monospace, monospace;
+    --data:ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; }
-  header { display:flex; flex-wrap:wrap; gap:14px; align-items:center; padding:8px 14px; border-bottom:1px solid var(--line); background:var(--panel); position:sticky; top:0; }
-  header b { color:var(--hot); }
-  .stat { color:var(--dim); } .stat span { color:var(--ink); }
-  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--bad); margin-right:4px; }
-  .dot.on { background:var(--hot); }
-  button { background:transparent; color:var(--hot); border:1px solid var(--hot); padding:3px 10px; font:inherit; cursor:pointer; }
-  button.paused { color:var(--warn); border-color:var(--warn); }
-  main { display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding:12px 14px; }
-  @media (max-width:900px) { main { grid-template-columns:1fr; } }
-  section { background:var(--panel); border:1px solid var(--line); padding:10px; }
-  h2 { margin:0 0 8px; font-size:11px; letter-spacing:.14em; color:var(--dim); text-transform:uppercase; }
-  .card { border:1px solid var(--line); padding:8px; margin-bottom:8px; }
-  .card .q { color:var(--dim); margin-bottom:6px; white-space:pre-wrap; }
-  .tag { display:inline-block; border:1px solid var(--hot); color:var(--hot); padding:0 5px; margin-right:6px; font-size:10px; }
-  .row { display:grid; grid-template-columns: 120px 1fr 48px; gap:6px; align-items:center; margin:2px 0; color:var(--dim); }
-  .row.win { color:var(--hot); }
-  .bar { height:8px; background:#122117; border:1px solid var(--line); }
-  .bar i { display:block; height:100%; background:var(--dim); }
-  .row.win .bar i { background:var(--hot); }
-  .meta { color:var(--dim); margin-top:4px; }
-  canvas { width:100%; aspect-ratio:1; background:#070c09; border:1px solid var(--line); display:block; }
-  #status { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
-  #log { max-height:220px; overflow:auto; }
-  #log div { border-bottom:1px dashed var(--line); padding:2px 0; }
-  #runs td, #runs th { padding:2px 6px; text-align:left; color:var(--dim); } #runs th { color:var(--ink); }
-  .src-fallback { color:var(--warn); } .src-reused { color:var(--dim); }
-  .sampled { color:var(--hot); }
+  body {
+    margin:0; background:var(--void); color:var(--bone);
+    font:12px/1.5 var(--data);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 3px);
+  }
+
+  /* --- the inlaid gold frame: outer gold, dark hairline, dim gold inner --- */
+  .panel {
+    background:var(--crypt);
+    border:3px solid var(--gold);
+    box-shadow: inset 0 0 0 2px var(--void), inset 0 0 0 3px var(--gold-dim);
+    padding:10px 12px 12px;
+  }
+  .panel > h2 {
+    margin:-4px -4px 10px; padding:0 0 6px;
+    font:400 13px/1 var(--pixel); color:var(--gold);
+    border-bottom:1px solid var(--gold-dim);
+  }
+
+  header { position:sticky; top:0; z-index:5; padding:10px 14px 0; background:var(--void); }
+  .hudbar { display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+  .brand { font:400 22px/1 var(--pixel); color:var(--gold); text-shadow:2px 2px 0 #000; margin-right:4px; }
+  .lamp { display:inline-flex; align-items:center; gap:5px; color:var(--dim); font:400 11px/1 var(--pixel); }
+  .lamp i { width:9px; height:9px; background:var(--blood); box-shadow:inset 0 0 0 1px #000; }
+  .lamp.on i { background:var(--xp); }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; margin:9px 0 0; }
+  .chip { padding:2px 7px; background:var(--void); box-shadow:inset 0 0 0 1px var(--gold-dim); color:var(--dim); white-space:nowrap; }
+  .chip b { color:var(--bone); font-weight:400; }
+
+  button {
+    margin-left:auto; padding:5px 14px; cursor:pointer;
+    font:400 12px/1 var(--pixel); color:var(--void); background:var(--gold);
+    border:0; box-shadow:inset 0 -3px 0 var(--gold-dim);
+  }
+  button.paused { background:var(--blood); color:var(--bone); box-shadow:inset 0 -3px 0 #7d2418; }
+  button:focus-visible, canvas:focus-visible { outline:2px solid var(--xp); outline-offset:2px; }
+
+  main { display:grid; grid-template-columns:minmax(320px,440px) 1fr; gap:12px; padding:12px 14px; align-items:start; }
+  .col { display:grid; gap:12px; align-content:start; }
+  .lower { padding:0 14px 16px; }
+  @media (max-width:900px) { main, .lower { grid-template-columns:1fr; } }
+
+  /* --- arena --- */
+  canvas { width:100%; aspect-ratio:1; display:block; background:#07050c; box-shadow:inset 0 0 0 1px var(--gold-dim); image-rendering:pixelated; }
+  .meters { margin-top:10px; display:grid; gap:5px; }
+  .meter { display:grid; grid-template-columns:34px 1fr auto; gap:8px; align-items:center; color:var(--dim); }
+  .meter > span:first-child { font:400 10px/1 var(--pixel); color:var(--dim); }
+  .trough { height:11px; background:var(--void); box-shadow:inset 0 0 0 1px var(--gold-dim); }
+  .trough i { display:block; height:100%; }
+  .hp i { background:linear-gradient(180deg,#e06055 0%,var(--blood) 45%,#7d2418 100%); }
+  .xp i { background:linear-gradient(180deg,#9fdcff 0%,var(--xp) 45%,#1c6f96 100%); }
+  .gear { margin-top:9px; display:flex; flex-wrap:wrap; gap:4px; }
+  .warnline { margin-top:9px; padding:3px 7px; color:var(--void); background:var(--gold); font:400 11px/1.4 var(--pixel); }
+
+  /* --- decisions --- */
+  #cards { display:flex; flex-direction:column; gap:10px; }
+  .card { background:var(--void); box-shadow:inset 0 0 0 1px var(--gold-dim); padding:8px 9px 9px; }
+  .kind { font:400 12px/1 var(--pixel); color:var(--gold); }
+  .q { display:block; color:var(--dim); margin:5px 0 7px; }
+  .row { display:grid; grid-template-columns:minmax(72px,132px) 1fr 42px; gap:7px; align-items:center; color:var(--dim); margin:3px 0; }
+  .row span:last-child { text-align:right; }
+  .row.win { color:var(--bone); }
+  .row .trough i { background:#3d3450; }
+  .row.win .trough i { background:linear-gradient(180deg,#f2d08a 0%,var(--gold) 45%,#a8761f 100%); }
+  .empty, .rest { color:var(--dim); }
+  .rest { margin:5px 0 0; }
+
+  /* --- log + runs --- */
+  #log { max-height:230px; overflow:auto; }
+  #log div { padding:2px 0; border-bottom:1px solid #241b30; color:var(--dim); }
+  #log div b { color:var(--bone); font-weight:400; }
+  table { width:100%; border-collapse:collapse; }
+  th { font:400 10px/1 var(--pixel); color:var(--gold); text-align:left; padding:0 8px 5px 0; border-bottom:1px solid var(--gold-dim); }
+  td { padding:3px 8px 3px 0; color:var(--dim); border-bottom:1px solid #241b30; }
+  td:first-child { color:var(--bone); }
+  .src-fallback { color:var(--blood); } .src-reused { color:var(--dim); } .sampled { color:var(--xp); }
 </style>
 </head>
 <body>
 <header>
-  <b>JEV // SURVIVORS OPS</b>
-  <span class="stat"><i class="dot" id="dot-plugin"></i>plugin</span>
-  <span class="stat"><i class="dot" id="dot-jev"></i>jev</span>
-  <span class="stat">run <span id="s-run">-</span></span>
-  <span class="stat">calls <span id="s-calls">0</span></span>
-  <span class="stat">last <span id="s-last">0</span>ms</span>
-  <span class="stat">avg <span id="s-avg">0</span>ms</span>
-  <span class="stat">cost $<span id="s-cost">0</span> (<span id="s-rate">0</span>/h)</span>
-  <span class="stat">jev/fallback/reused <span id="s-mix">0/0/0</span></span>
-  <button id="pause">PAUSE</button>
+  <div class="hudbar">
+    <span class="brand">JEV SURVIVORS</span>
+    <span class="lamp" id="dot-plugin"><i></i>plugin</span>
+    <span class="lamp" id="dot-jev"><i></i>jev</span>
+    <button id="pause">PAUSE</button>
+  </div>
+  <div class="chips">
+    <span class="chip">run <b id="s-run">—</b></span>
+    <span class="chip">calls <b id="s-calls">0</b></span>
+    <span class="chip">last <b id="s-last">0</b>ms</span>
+    <span class="chip">avg <b id="s-avg">0</b>ms</span>
+    <span class="chip">cost $<b id="s-cost">0</b></span>
+    <span class="chip">per hour $<b id="s-rate">0</b></span>
+    <span class="chip">jev <b id="s-jev">0</b></span>
+    <span class="chip">fallback <b id="s-fb">0</b></span>
+    <span class="chip">reused <b id="s-re">0</b></span>
+  </div>
 </header>
+
 <main>
-  <section>
-    <h2>Judgments</h2>
-    <div id="cards"></div>
+  <div class="col">
+  <section class="panel">
+    <h2>Arena</h2>
+    <canvas id="radar" width="320" height="320" aria-label="Arena around the survivor"></canvas>
+    <div class="meters">
+      <div class="meter"><span>health</span><div class="trough hp"><i id="m-hp" style="width:0"></i></div><span id="v-hp">—</span></div>
+      <div class="meter"><span>level</span><div class="trough xp"><i id="m-xp" style="width:0"></i></div><span id="v-xp">—</span></div>
+    </div>
+    <div class="gear" id="gear"></div>
+    <div class="warnline" id="warn" hidden></div>
   </section>
-  <section>
-    <h2>Radar</h2>
-    <div id="status"></div>
-    <canvas id="radar" width="480" height="480"></canvas>
-    <h2 style="margin-top:12px">Log</h2>
+
+  <section class="panel">
+    <h2>Log</h2>
     <div id="log"></div>
-    <h2 style="margin-top:12px">Runs this session</h2>
-    <table id="runs"><thead><tr><th>character</th><th>stage</th><th>seconds</th><th>level</th><th>jev</th><th>fallback</th></tr></thead><tbody></tbody></table>
+  </section>
+  </div>
+
+  <section class="panel">
+    <h2>Decisions</h2>
+    <div id="cards"><p class="empty">Nothing decided yet. Start the game from Steam and the first choice will appear here.</p></div>
   </section>
 </main>
+
+<div class="lower">
+  <section class="panel">
+    <h2>Runs this session</h2>
+    <table id="runs"><thead><tr><th>character</th><th>stage</th><th>seconds</th><th>level</th><th>jev</th><th>fallback</th></tr></thead><tbody></tbody></table>
+  </section>
+</div>
+
 <script>
 (() => {
   const KINDS = ["direction", "level_up", "weapon_select", "arcana_select", "character", "stage"];
   const SECTORS = ["north","north_east","east","south_east","south","south_west","west","north_west"];
-  const PRESSURE_ALPHA = { none: 0.0, light: 0.15, moderate: 0.35, heavy: 0.6 };
+  const PRESSURE_ALPHA = { none:0, light:0.14, moderate:0.34, heavy:0.58 };
+  const XP_FRACTION = { "just levelled":0.12, "partway to the next level":0.42, "close to the next level":0.72, "a level up is imminent":0.95 };
   let automation = true;
   const $ = (id) => document.getElementById(id);
+  const trim = (s, n) => {
+    const t = String(s || "").trim();
+    if (t.length <= n) return t;
+    const cut = t.slice(0, n);
+    const stop = cut.lastIndexOf(". ");
+    if (stop > n * 0.55) return cut.slice(0, stop + 1);        // end on a whole sentence when one fits
+    return cut.slice(0, Math.max(cut.lastIndexOf(" "), 0)).replace(/[,;:]$/, "") + "…";
+  };
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
 
   function renderStats(s) {
     $("dot-plugin").classList.toggle("on", !!s.plugin_connected);
     $("dot-jev").classList.toggle("on", !!s.jev_ok);
-    $("s-calls").textContent = s.calls; $("s-last").textContent = s.last_latency_ms; $("s-avg").textContent = s.avg_latency_ms;
-    $("s-cost").textContent = (s.cost_usd || 0).toFixed(4); $("s-rate").textContent = (s.cost_per_hour_usd || 0).toFixed(2);
-    $("s-mix").textContent = `${s.jev_calls}/${s.fallback_calls}/${s.reused}`;
+    $("s-calls").textContent = s.calls ?? 0;
+    $("s-last").textContent = s.last_latency_ms ?? 0;
+    $("s-avg").textContent = s.avg_latency_ms ?? 0;
+    $("s-cost").textContent = (s.cost_usd || 0).toFixed(4);
+    $("s-rate").textContent = (s.cost_per_hour_usd || 0).toFixed(2);
+    $("s-jev").textContent = s.jev_calls ?? 0;
+    $("s-fb").textContent = s.fallback_calls ?? 0;
+    $("s-re").textContent = s.reused ?? 0;
   }
 
   function card(kind) {
     let el = document.querySelector(`.card[data-kind="${kind}"]`);
-    if (!el) { el = document.createElement("div"); el.className = "card"; el.dataset.kind = kind; $("cards").appendChild(el); }
+    if (!el) {
+      const empty = document.querySelector("#cards .empty");
+      if (empty) empty.remove();
+      el = document.createElement("div");
+      el.className = "card"; el.dataset.kind = kind;
+      el.style.order = KINDS.indexOf(kind) >= 0 ? KINDS.indexOf(kind) : KINDS.length;
+      $("cards").appendChild(el);
+    }
     return el;
   }
 
   function renderDecision(d) {
     const el = card(d.kind);
-    const keys = Object.keys(d.probabilities || {});
-    keys.sort((a, b) => (d.probabilities[b] - d.probabilities[a]));
+    const probs = d.probabilities || {};
+    const all = Object.keys(probs).sort((a, b) => probs[b] - probs[a]);
+    const keys = all.filter(k => (probs[k] || 0) >= 0.01 || k === d.choice).slice(0, 7);
+    const hidden = all.length - keys.length;
     const rows = keys.map(k => {
-      const p = d.probabilities[k] || 0;
+      const p = probs[k] || 0;
       const label = (d.labels && d.labels[k]) || k;
-      return `<div class="row ${k === d.choice ? "win" : ""}"><span title="${label}">${label.slice(0, 18)}</span><div class="bar"><i style="width:${(p * 100).toFixed(1)}%"></i></div><span>${p.toFixed(2)}</span></div>`;
+      return `<div class="row ${k === d.choice ? "win" : ""}"><span title="${esc(label)}">${esc(label.slice(0, 20))}</span>`
+           + `<div class="trough"><i style="width:${(p * 100).toFixed(1)}%"></i></div><span>${p.toFixed(2)}</span></div>`;
     }).join("");
-    el.innerHTML = `<span class="tag">${d.kind.toUpperCase()}</span><span class="q">${(d.instructions || "").slice(0, 220)}</span>${rows}
-      <div class="meta">conf ${(d.confidence || 0).toFixed(2)} · ${d.latency_ms || 0}ms · <span class="src-${d.source}">${d.source}</span>${d.sampled ? ' · <span class="sampled">sampled</span>' : ''}</div>`;
-    if (d.kind === "direction") renderRadar(d);
+    const chips = `<span class="chip">confidence <b>${(d.confidence || 0).toFixed(2)}</b></span>`
+      + `<span class="chip">${d.latency_ms || 0}<b>ms</b></span>`
+      + `<span class="chip src-${esc(d.source)}">${esc(d.source)}</span>`
+      + (d.sampled ? `<span class="chip sampled">sampled</span>` : "");
+    el.innerHTML = `<span class="kind">${esc(d.kind.replace(/_/g, " "))}</span>`
+      + `<span class="q">${esc(trim(d.instructions, 170))}</span>${rows}`
+      + (hidden > 0 ? `<p class="rest">${hidden} more below 0.01</p>` : "")
+      + `<div class="chips">${chips}</div>`;
+    if (d.kind === "direction") renderArena(d);
   }
 
-  function renderStatus(p) {
+  function renderPlayer(p) {
     if (!p) return;
-    $("status").innerHTML = [`hp ${p.hp_bucket} (${Math.round(p.hp)}/${Math.round(p.max_hp)})`, `level ${p.level}`, `minute ${p.minute}`,
-      `weapons: ${(p.weapons || []).join(", ") || "-"}`, `passives: ${(p.passives || []).join(", ") || "-"}`].map(t => `<span>${t}</span>`).join("");
+    const hpPct = p.max_hp > 0 ? Math.max(0, Math.min(1, p.hp / p.max_hp)) : 0;
+    $("m-hp").style.width = (hpPct * 100).toFixed(1) + "%";
+    $("v-hp").textContent = `${Math.round(p.hp)}/${Math.round(p.max_hp)} ${p.hp_bucket || ""}`.trim();
+    const xpPct = XP_FRACTION[p.xp_bucket] ?? 0;
+    $("m-xp").style.width = (xpPct * 100).toFixed(1) + "%";
+    $("v-xp").textContent = p.xp_bucket || "—";
+    const gear = [`level ${p.level ?? 0}`, `minute ${p.minute ?? 0}`]
+      .concat(p.weapons || []).concat(p.passives || [])
+      .map(t => `<span class="chip">${esc(t)}</span>`).join("");
+    $("gear").innerHTML = gear;
+    const warn = $("warn");
+    warn.hidden = !p.stuck;
+    if (p.stuck) warn.textContent = "Shuffling in place, not getting anywhere";
   }
 
-  function renderRadar(d) {
-    const cv = $("radar"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, cx = W / 2, cy = H / 2, R = W / 2 - 6;
+  function renderArena(d) {
+    const cv = $("radar"), ctx = cv.getContext("2d");
+    const W = cv.width, H = cv.height, cx = W / 2, cy = H / 2, R = W / 2 - 4;
+    ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, W, H);
     const sectors = (d.digest && d.digest.sectors) || {};
-    renderStatus(d.digest && d.digest.player);
+    renderPlayer(d.digest && d.digest.player);
+
     SECTORS.forEach((name, i) => {
       const a0 = (i * 45 - 22.5 - 90) * Math.PI / 180, a1 = a0 + Math.PI / 4;
       const s = sectors[name] || {};
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0, a1); ctx.closePath();
-      ctx.fillStyle = `rgba(255,92,92,${PRESSURE_ALPHA[s.pressure] || 0})`; ctx.fill();
-      ctx.strokeStyle = "#1d3a25"; ctx.stroke();
-      if (s.gems && s.gems !== "none") { ctx.fillStyle = "rgba(57,255,122,0.12)"; ctx.fill(); }
-      if (s.blocked) { ctx.strokeStyle = "#ffb347"; ctx.lineWidth = 3; ctx.stroke(); ctx.lineWidth = 1; }
+      ctx.fillStyle = `rgba(192,57,43,${PRESSURE_ALPHA[s.pressure] || 0})`; ctx.fill();
+      if (s.gems && s.gems !== "none") { ctx.fillStyle = "rgba(79,195,247,0.10)"; ctx.fill(); }
+      ctx.lineWidth = 1; ctx.setLineDash([]); ctx.strokeStyle = "#2c2340"; ctx.stroke();
+      if (s.blocked) { ctx.lineWidth = 3; ctx.setLineDash([5, 4]); ctx.strokeStyle = "#d9a441"; ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1; }
     });
+
     const ent = d.entities || {}, half = (ent.screen && ent.screen.half_h) || 1;
     const scale = R / (half * 1.6);
-    const dot = (list, color, r) => (list || []).forEach(e => {
-      ctx.beginPath(); ctx.arc(cx + e.x * scale, cy - e.y * scale, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
-    });
-    dot(ent.gems, "#39ff7a", 2); dot(ent.pickups, "#ffb347", 4);
-    dot((ent.enemies || []).filter(e => !e.boss), "#ff5c5c", 3); dot((ent.enemies || []).filter(e => e.boss), "#ff2b2b", 7);
-    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fillStyle = "#b8f0c3"; ctx.fill();
+    const pixel = (list, color, size) => {
+      ctx.fillStyle = color;
+      (list || []).forEach(e => {
+        const x = Math.round(cx + e.x * scale - size / 2), y = Math.round(cy - e.y * scale - size / 2);
+        ctx.fillRect(x, y, size, size);
+      });
+    };
+    pixel(ent.gems, "#4fc3f7", 3);
+    pixel(ent.pickups, "#d9a441", 6);
+    pixel((ent.enemies || []).filter(e => !e.boss), "#c0392b", 4);
+    pixel((ent.enemies || []).filter(e => e.boss), "#ff5647", 10);
+
     if (d.choice && d.choice !== "stay") {
-      const idx = SECTORS.indexOf(d.choice), ang = (idx * 45 - 90) * Math.PI / 180;
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ang) * R * 0.5, cy + Math.sin(ang) * R * 0.5);
-      ctx.strokeStyle = "#39ff7a"; ctx.lineWidth = 3; ctx.stroke(); ctx.lineWidth = 1;
+      const ang = (SECTORS.indexOf(d.choice) * 45 - 90) * Math.PI / 180;
+      ctx.strokeStyle = "#d9a441"; ctx.lineWidth = 4; ctx.lineCap = "butt";
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ang) * R * 0.52, cy + Math.sin(ang) * R * 0.52); ctx.stroke();
+      ctx.lineWidth = 1;
     }
+    ctx.fillStyle = "#000"; ctx.fillRect(cx - 5, cy - 5, 10, 10);
+    ctx.fillStyle = "#ede4d3"; ctx.fillRect(cx - 3, cy - 3, 6, 6);
   }
 
   function addLog(e) {
     const div = document.createElement("div");
-    div.textContent = `${new Date((e.t || Date.now() / 1000) * 1000).toLocaleTimeString()}  ${e.text}`;
+    const when = new Date((e.t || Date.now() / 1000) * 1000).toLocaleTimeString();
+    div.innerHTML = `${esc(when)}  <b>${esc(e.text)}</b>`;
     $("log").prepend(div);
     while ($("log").childElementCount > 50) $("log").lastElementChild.remove();
   }
 
-  function addRun(summary) {
-    if (!summary) return;
+  function addRun(s) {
+    if (!s) return;
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${summary.character || "-"}</td><td>${summary.stage || "-"}</td><td>${summary.seconds || 0}</td><td>${summary.level || 0}</td><td>${summary.jev_calls ?? "-"}</td><td>${summary.fallback_calls ?? "-"}</td>`;
+    tr.innerHTML = [s.character || "—", s.stage || "—", s.seconds || 0, s.level || 0, s.jev_calls ?? "—", s.fallback_calls ?? "—"]
+      .map(v => `<td>${esc(v)}</td>`).join("");
     document.querySelector("#runs tbody").prepend(tr);
   }
 
@@ -156,23 +301,30 @@
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
       if (m.type === "snapshot") {
-        renderStats(m.stats); Object.values(m.decisions || {}).forEach(renderDecision);
-        $("log").replaceChildren(); document.querySelector("#runs tbody").replaceChildren();
-        (m.log || []).slice().reverse().forEach(addLog); $("s-run").textContent = (m.run && m.run.character) || "-";
+        renderStats(m.stats || {});
+        $("log").replaceChildren();
+        document.querySelector("#runs tbody").replaceChildren();
+        Object.values(m.decisions || {}).forEach(renderDecision);
+        (m.log || []).slice().reverse().forEach(addLog);
         (m.runs || []).forEach(addRun);
+        $("s-run").textContent = (m.run && m.run.character) || "—";
       } else if (m.type === "stats") renderStats(m);
       else if (m.type === "decision") renderDecision(m);
       else if (m.type === "event") addLog(m);
-      else if (m.type === "run") { if (m.phase === "end") addRun(m.summary); $("s-run").textContent = m.phase === "start" ? "starting" : "-"; }
+      else if (m.type === "run") {
+        if (m.phase === "end") addRun(m.summary);
+        $("s-run").textContent = m.phase === "start" ? "starting" : "—";
+      }
     };
     ws.onclose = () => setTimeout(connect, 1000);
   }
+
   $("pause").onclick = () => {
     automation = !automation;
-    $("pause").textContent = automation ? "PAUSE" : "RESUME"; $("pause").classList.toggle("paused", !automation);
+    $("pause").textContent = automation ? "PAUSE" : "RESUME";
+    $("pause").classList.toggle("paused", !automation);
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "control", automation }));
   };
-  KINDS.forEach(card);
   connect();
 })();
 </script>
