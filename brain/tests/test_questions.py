@@ -74,7 +74,7 @@ def test_direction_question_shape():
     assert "heavy" in ask.question.criteria["north"] or "moderate" in ask.question.criteria["north"]
     assert ask.state["player"]["hp"] == "critical"
     assert "WHIP L3" in ask.state["player"]["weapons"]
-    assert "safety" in ask.instructions.lower() or "away" in ask.instructions.lower()
+    assert "safest" in ask.instructions.lower()
 
 
 def test_direction_question_carries_level_progress_and_instructions_mention_blocked():

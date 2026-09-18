@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 
 from .digest import Digest, digest_state
-from .questions import DIRECTIONS, Ask, Thresholds, direction_question, options_question
+from .questions import DIRECTIONS, VARIETY_KINDS, Ask, Thresholds, direction_question, options_question
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +19,6 @@ WARN_INTERVAL_S = 60.0  # rate limit for fallback-failure warnings; see Decider.
 # character and stage picks are sampled (not always Jev's top answer) so a human doesn't see the
 # same character and stage every run; options below this probability are never sampled.
 SAMPLE_FLOOR = 0.05
-_VARIETY_KINDS = ("character", "stage")
 
 
 @dataclass
@@ -47,14 +46,18 @@ class Decision:
 
 
 def fallback_direction(d: Digest) -> str:
-    """Least pressure wins; ties broken by most gems; all quiet means stay."""
+    """Least pressure wins among unblocked sectors; ties broken by most gems; all quiet, or every
+    compass sector blocked, means stay."""
     best = None
     for name in DIRECTIONS[:-1]:
         s = d.sectors[name]
+        if s.blocked:
+            continue
         key = (_PRESSURE_RANK[s.pressure], -_GEM_RANK[s.gems], -s.gem_count)
         if best is None or key < best[0]:
             best = (key, name)
-    assert best is not None
+    if best is None:
+        return "stay"
     if best[0][0] == 0 and best[0][1] == 0:
         return "stay"
     return best[1]
@@ -141,11 +144,11 @@ class Decider:
             idx = fallback_pick(options)
             choice, conf, source = ask.keys[idx], 0.0, "fallback"
             probs = {k: (1.0 if k == choice else 0.0) for k in ask.keys}
-        elif kind in _VARIETY_KINDS:
-            sampled = True
+        elif kind in VARIETY_KINDS:
             picked = self._sample_choice(probs, ask.keys)
             if picked is not None:
                 choice = picked
+                sampled = True
         return Decision(
             kind=kind, choice=choice, index=ask.keys.index(choice), probabilities=probs,
             confidence=conf, latency_ms=latency, source=source, input_tokens=tokens,

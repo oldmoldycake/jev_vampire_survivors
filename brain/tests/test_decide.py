@@ -4,7 +4,7 @@ import random
 import pytest
 
 from jev_vs import decide
-from jev_vs.digest import digest_state
+from jev_vs.digest import Digest, PlayerSummary, SectorSummary, digest_state
 from jev_vs.questions import DEFAULT_THRESHOLDS as TH
 from tests.conftest import FakeJev, enemy, gem, make_state
 
@@ -49,6 +49,36 @@ def test_fallback_direction_prefers_least_pressure_then_gems():
 
 def test_fallback_direction_stays_when_all_quiet():
     assert decide.fallback_direction(digest_state(make_state(), TH)) == "stay"
+
+
+def test_fallback_direction_never_returns_a_blocked_sector():
+    # west would otherwise be the obvious least-pressure pick (no enemies at all), but it's
+    # blocked; north has only a light-pressure far enemy, every other sector has a touching one.
+    st = make_state(enemies=[
+        enemy(0, 3.9),      # north: far -> light pressure
+        enemy(0.21, 0.21),  # north_east: touching -> moderate pressure
+        enemy(0.3, 0),      # east
+        enemy(0.21, -0.21), # south_east
+        enemy(0, -0.3),     # south
+        enemy(-0.21, -0.21),# south_west
+        enemy(-0.21, 0.21), # north_west
+    ])
+    st["player"]["applied_direction"] = "west"
+    st["player"]["moved"] = 0.0
+    d = digest_state(st, TH)
+    assert d.sectors["west"].blocked is True
+    assert d.sectors["west"].pressure == "none"   # confirms it would otherwise win
+    assert decide.fallback_direction(d) == "north"
+
+
+def test_fallback_direction_stays_when_every_compass_sector_is_blocked():
+    # Every sector has the same non-quiet stats (none pressure, a few gems) so the pre-existing
+    # "all quiet -> stay" shortcut can't explain a "stay" result by coincidence; only excluding
+    # blocked sectors from the ranking can.
+    sectors = {name: SectorSummary(blocked=True, gems="few", gem_count=1) for name in decide.DIRECTIONS[:-1]}
+    player = PlayerSummary(hp_bucket="ok", hp=80.0, max_hp=100.0, level=1, minute=1)
+    d = Digest(player=player, sectors=sectors)
+    assert decide.fallback_direction(d) == "stay"
 
 
 async def test_pick_maps_choice_to_index():
@@ -111,6 +141,17 @@ async def test_pick_character_samples_but_never_below_sample_floor():
         seen.add(decision.choice)
     assert "C" not in seen   # C's 1% probability is below SAMPLE_FLOOR (5%) and is never chosen
     assert seen.issubset({"A", "B"})
+
+
+async def test_pick_character_keeps_jevs_top_answer_when_every_option_is_below_sample_floor():
+    opts = [{"index": i, "id": f"OPT{i}", "name": f"Opt {i}"} for i in range(20)]
+    probs = {f"OPT{i}": 0.04 for i in range(20)}   # all below SAMPLE_FLOOR (0.05)
+    fake = FakeJev(script={"character": ("OPT0", probs, 0.9)})
+    dec = decide.Decider(fake, TH, rng=random.Random(7))
+    decision = await dec.pick("character", opts)
+    assert decision.choice == "OPT0"
+    assert decision.source == "jev"
+    assert decision.sampled is False
 
 
 async def test_pick_level_up_always_returns_jevs_top_answer():

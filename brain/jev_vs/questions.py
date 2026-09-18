@@ -56,18 +56,18 @@ DIRECTION_VECTORS: dict[str, tuple[float, float]] = {
 
 DIRECTION_INSTRUCTIONS = (
     "You steer the survivor in a top-down arena. Each option is a direction to walk for the next "
-    "quarter second, described by what lies that way. Walk away from heavy or touching enemy pressure "
-    "and never walk into it. Never choose a direction described as blocked; pick another way around, "
-    "since the survivor cannot actually move that way. "
-    "When the player's hp is critical or low, choose safety over gems and never detour for anything; "
-    "when hp is low, prefer healing above everything else. "
-    "When hp is ok or full, prefer the direction with gems as long as its pressure is none or light. "
-    "When a level up is imminent or close and hp is ok or full, prefer a direction with gems even at "
-    "light pressure; leveling up is how the survivor gets stronger. "
-    "Survive first, and detour only when it is safe to do so: go for chests, coffin unlocks and relics "
-    "only when that direction's pressure is none or light. Coins are the lowest priority and are never "
-    "worth a detour into danger. "
-    "Prefer chests and avoid bosses unless hp is full. Choose stay only when every direction is worse than standing still."
+    "quarter second, described by what lies that way. "
+    "Never choose a direction described as blocked: the survivor cannot move that way at all. "
+    "Never walk into heavy or touching enemy pressure. "
+    "When hp is critical, choose the safest direction and ignore everything else. "
+    "When hp is low, go for healing if a direction has it and its pressure is none or light, "
+    "otherwise choose the safest direction. "
+    "When hp is ok or full, prefer a direction with gems whose pressure is none or light, and prefer "
+    "gems more strongly when a level up is close or imminent, because leveling up is how the survivor "
+    "gets stronger. Chests, coffin unlocks and relics are worth walking to when that direction's "
+    "pressure is none or light. Coins are the lowest priority and never worth a detour. "
+    "Avoid a direction with a boss unless hp is full. "
+    "Choose stay only when every direction is worse than standing still."
 )
 
 
@@ -195,7 +195,7 @@ _PICK_INSTRUCTIONS = {
 }
 
 # Kinds where the run history is fed back in, so the same pick isn't made every time.
-_VARIETY_KINDS = ("character", "stage")
+VARIETY_KINDS = ("character", "stage")
 VARIETY_INSTRUCTIONS = (
     " The recently_played list shows what was picked in recent runs, most recent first. Prefer an "
     "option that does not appear in recently_played; only repeat one when every option was played recently."
@@ -247,7 +247,7 @@ def options_question(kind: str, options: list[dict], build: dict | None, recent:
             "run_phase": _minute_words(int(build.get("minute", 0))),
         }
     instructions = _PICK_INSTRUCTIONS[kind]
-    if kind in _VARIETY_KINDS and recent:
+    if kind in VARIETY_KINDS and recent:
         state["recently_played"] = list(recent)
         instructions = instructions + VARIETY_INSTRUCTIONS
     return Ask(

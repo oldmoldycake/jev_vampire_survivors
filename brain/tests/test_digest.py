@@ -170,3 +170,10 @@ def test_not_blocked_when_applied_direction_missing():
     st["player"]["moved"] = 0.0
     d = digest.digest_state(st, TH)
     assert all(not s.blocked for s in d.sectors.values())
+
+
+def test_not_blocked_when_moved_is_absent():
+    st = make_state()
+    st["player"]["applied_direction"] = "north"   # valid compass direction, but no "moved" field at all
+    d = digest.digest_state(st, TH)
+    assert all(not s.blocked for s in d.sectors.values())

@@ -9,6 +9,7 @@ from . import protocol
 from .config import Config
 from .decide import Decider, Decision
 from .hub import Hub
+from .questions import VARIETY_KINDS
 from .runlog import RunLog
 from .stats import Stats
 
@@ -212,7 +213,7 @@ class PluginServer:
             self.runlog.start_run({})
             self.current_run = {"started_at": time.time()}
             self.hub.publish({"type": "run", "phase": "start", "meta": self.current_run})
-        recent = _recent_values(self.run_history, kind) if kind in ("character", "stage") else None
+        recent = _recent_values(self.run_history, kind) if kind in VARIETY_KINDS else None
         decision = await self.decider.pick(kind, options, msg.get("build"), recent=recent)
         chosen = options[decision.index]
         reply_index = chosen.get("index", decision.index)

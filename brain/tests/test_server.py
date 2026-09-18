@@ -140,6 +140,21 @@ async def test_game_over_with_no_active_run_does_not_add_history_row(tmp_path):
     await srv.stop()
 
 
+async def test_character_select_carries_recently_played_from_run_history(tmp_path):
+    jev = FakeJev(script={"character": ("IMELDA", {"IMELDA": 1.0}, 0.9)})
+    srv, hub, stats, reader, writer = await _start(tmp_path, jev)
+    # Two finished runs, oldest first, as run_history stores them.
+    srv.run_history.append({"character": "ANTONIO", "stage": "FOREST"})
+    srv.run_history.append({"character": "IMELDA", "stage": "DAIRY_PLANT"})
+    chars = [{"id": "ANTONIO", "name": "Antonio", "description": "d"}, {"id": "IMELDA", "name": "Imelda", "description": "d"}]
+    await _send(writer, {"id": 1, "type": "event", "event": "character_select", "options": chars})
+    await _recv(reader)
+    state = jev.calls[-1][0]
+    assert state["recently_played"] == ["IMELDA", "ANTONIO"]   # most recent first
+    writer.close()
+    await srv.stop()
+
+
 async def test_pick_reply_echoes_options_own_index(tmp_path):
     jev = FakeJev(script={"character": ("B", {"A": 0.0, "B": 1.0}, 1.0)})
     srv, hub, stats, reader, writer = await _start(tmp_path, jev)
