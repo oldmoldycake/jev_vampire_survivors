@@ -183,7 +183,7 @@ Responsibilities:
 | Situation | Plugin behaviour | Brain behaviour |
 |---|---|---|
 | Brain not running or connection drops | Keeps the last movement vector for up to 1 s, then stops moving; menus wait `reply_timeout_ms` then take option 0 or default confirm; reconnects every 2 s | n/a |
-| Tick reply late | Ignored if a newer reply exists; otherwise applied when it arrives | Drops overlapping ticks |
+| Tick reply late | Applied on arrival, since a later Jev reply is fresher information than an earlier reused one; `Movement.Expire` zeroes the vector after 1 s of silence | Answers overlapping ticks immediately with the last decision (`source: reused`) |
 | Jev error or timeout | Applies whatever reply arrives | SDK `RetryPolicy` then heuristic fallback, reply marked `fallback` |
 | Unknown UI page | Default confirm after `unknown_page_timeout_s`, logged | n/a |
 | Exception inside a Harmony patch | Caught and logged; the original game method still runs | n/a |
