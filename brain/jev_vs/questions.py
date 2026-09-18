@@ -177,7 +177,11 @@ def options_question(kind: str, options: list[dict], build: dict | None) -> Ask:
         labels[key] = str(o.get("name", base))
     state: dict = {"decision": kind.replace("_", " ")}
     if build:
-        state["build"] = build
+        state["build"] = {
+            "weapons": list(build.get("weapons", [])),
+            "passives": list(build.get("passives", [])),
+            "run_phase": _minute_words(int(build.get("minute", 0))),
+        }
     instructions = _PICK_INSTRUCTIONS[kind]
     return Ask(
         name=kind,

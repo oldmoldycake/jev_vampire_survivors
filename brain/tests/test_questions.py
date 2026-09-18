@@ -50,6 +50,9 @@ def test_options_question_keys_follow_option_order_and_are_unique():
     assert list(ask.question.criteria) == ask.keys
     assert "Whip" in ask.labels["WHIP"]
     assert ask.state["build"]["weapons"] == ["WHIP L4"]
+    assert ask.state["build"]["run_phase"] == "early-mid run"
+    assert "level" not in ask.state["build"] and "minute" not in ask.state["build"]
+    assert not any(isinstance(v, int) for v in ask.state["build"].values())
 
 
 def test_options_question_mentions_evolution_and_new():
