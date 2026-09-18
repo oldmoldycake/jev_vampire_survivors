@@ -32,6 +32,7 @@ namespace JevSurvivors
         public static ConfigEntry<KeyCode> ToggleKey;
 
         internal Transport Transport { get; private set; }
+        internal StateSampler Sampler { get; private set; }
 
         private Harmony _harmony;
 
@@ -56,6 +57,7 @@ namespace JevSurvivors
             Automation = AutoplayOnBoot.Value;
             Transport = new Transport(Host.Value, Port.Value, HelloJson);
             Transport.Start();
+            Sampler = new StateSampler(Transport);
             _harmony = new Harmony(Id);
             _harmony.PatchAll(typeof(Plugin).Assembly);
             Log.LogInfo($"{Name} {Version} loaded; automation={Automation}");
@@ -65,6 +67,8 @@ namespace JevSurvivors
         {
             if (Input.GetKeyDown(ToggleKey.Value)) SetAutomation(!Automation, "hotkey");
             Transport.Pump(OnUnsolicited);
+            Sampler.Update();
+            Movement.Expire();
             Probe.Update();
         }
 
@@ -81,6 +85,11 @@ namespace JevSurvivors
         private void OnUnsolicited(JObject msg)
         {
             var type = (string)msg["type"];
+            if (type == "move")
+            {
+                Movement.Apply(msg);   // a late reply is still the brain's latest knowledge
+                return;
+            }
             if (type == "control")
             {
                 SetAutomation((bool?)msg["automation"] ?? true, "brain");
@@ -92,6 +101,7 @@ namespace JevSurvivors
         public void SetAutomation(bool on, string why)
         {
             Automation = on;
+            if (!on) Movement.Clear();
             Log.LogInfo($"automation {(on ? "ON" : "OFF")} ({why})");
         }
 
