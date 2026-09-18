@@ -39,6 +39,9 @@ namespace JevSurvivors
         };
 
         public int RunsStarted { get; private set; }
+        /// <summary>True between a run starting and that run actually ending. A revive re-shows
+        /// MainGamePage, so without this a revived run would be counted against MaxRuns twice.</summary>
+        private bool _runInProgress;
         public int RunsFinished { get; private set; }
 
         public MenuDriver(Plugin plugin, Transport transport)
@@ -308,7 +311,11 @@ namespace JevSurvivors
         {
             Movement.Clear();
             StateSampler.ResetTracking();
-            RunsStarted++;   // counts an actual run start, not just a character confirm that might not reach gameplay
+            if (!_runInProgress)
+            {
+                _runInProgress = true;
+                RunsStarted++;   // an actual run start, not a character confirm that never reached gameplay, and not a revive
+            }
             var gm = GM.Core;
             Plugin.Log.LogInfo($"run started: {gm?.Player?.CharacterType} on {gm?.PlayerOptions?.Config?.SelectedStage}");
         }
@@ -522,6 +529,7 @@ namespace JevSurvivors
                 page.Revive();
                 yield break;
             }
+            _runInProgress = false;
             RunsFinished++;
             // Telemetry below is deliberately not gated by automation: a run that ended is counted and reported either way.
             var gm = GM.Core;
