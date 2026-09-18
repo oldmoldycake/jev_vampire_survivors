@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>JevSurvivors</AssemblyName>
+    <RootNamespace>JevSurvivors</RootNamespace>
+    <Version>0.1.0</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <DebugType>portable</DebugType>
+    <NoWarn>$(NoWarn);MSB3277;CS0618;CS0649</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx" Private="false"><HintPath>$(BepInExDir)/core/BepInEx.dll</HintPath></Reference>
+    <Reference Include="0Harmony" Private="false"><HintPath>$(BepInExDir)/core/0Harmony.dll</HintPath></Reference>
+    <Reference Include="VampireSurvivors.Runtime" Private="false" Publicize="true"><HintPath>$(ManagedDir)/VampireSurvivors.Runtime.dll</HintPath></Reference>
+    <Reference Include="PauseSystem" Private="false"><HintPath>$(ManagedDir)/PauseSystem.dll</HintPath></Reference>
+    <Reference Include="PhaserPort" Private="false"><HintPath>$(ManagedDir)/PhaserPort.dll</HintPath></Reference>
+    <Reference Include="Zenject" Private="false"><HintPath>$(ManagedDir)/Zenject.dll</HintPath></Reference>
+    <Reference Include="UnityEngine" Private="false"><HintPath>$(ManagedDir)/UnityEngine.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule" Private="false"><HintPath>$(ManagedDir)/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.InputLegacyModule" Private="false"><HintPath>$(ManagedDir)/UnityEngine.InputLegacyModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.UI" Private="false"><HintPath>$(ManagedDir)/UnityEngine.UI.dll</HintPath></Reference>
+    <Reference Include="Unity.TextMeshPro" Private="false"><HintPath>$(ManagedDir)/Unity.TextMeshPro.dll</HintPath></Reference>
+    <Reference Include="Newtonsoft.Json" Private="false"><HintPath>$(ManagedDir)/Newtonsoft.Json.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <GameDir Condition="'$(GameDir)' == ''">$(HOME)/.local/share/Steam/steamapps/common/Vampire Survivors</GameDir>
+    <ManagedDir>$(GameDir)/VampireSurvivors_Data/Managed</ManagedDir>
+    <BepInExDir>$(GameDir)/BepInEx</BepInExDir>
+  </PropertyGroup>
+</Project>
