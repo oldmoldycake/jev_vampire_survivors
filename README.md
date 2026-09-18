@@ -1,5 +1,10 @@
 # Jev plays Vampire Survivors
 
+[![CI](https://img.shields.io/github/actions/workflow/status/OldMoldyCake/jev_vampire_survivors/ci.yml?branch=main&label=CI)](https://github.com/OldMoldyCake/jev_vampire_survivors/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
+[![Platform: Linux](https://img.shields.io/badge/platform-Linux-lightgrey)](#platform-support)
+
 [TypeSafe](https://typesafe.ai/)'s **Jev** model picks the character, the stage, every level-up,
 and the walking direction four times a second, in the real Steam game — with a live ops
 dashboard showing every decision as it happens.
@@ -55,6 +60,10 @@ Steam ──launches──▶ Vampire Survivors (Unity, Mono)
   a probability bar per option, the chosen option highlighted, confidence, latency, and a radar
   view of what the model was shown.
 
+Character and stage picks are *sampled* from Jev's probability distribution rather than taken
+as its single top answer, so consecutive runs vary instead of replaying the same opening;
+level-up and direction decisions always take its top choice.
+
 The brain starts first and listens; the plugin connects to it when the game loads and
 reconnects automatically if the connection drops. If the brain or the API is unreachable, the
 plugin keeps the game running on safe defaults — it never stalls waiting for an answer.
@@ -83,6 +92,7 @@ game assembly so you can find the new member names and update the matching C# fi
 Install once, in any order:
 
 - **Vampire Survivors**, purchased and installed via Steam, with Steam running.
+- **`curl` and `unzip`**, used by `scripts/install_bepinex.sh` (present on most distros already).
 - **[uv](https://github.com/astral-sh/uv)** — runs and manages the Python brain. Python 3.12+
   is pulled in by `uv` automatically; you don't need to install Python yourself.
 - **.NET 8 SDK**, to build the C# plugin:
@@ -156,7 +166,8 @@ A few things worth knowing while it's running:
 ## Tuning
 
 - **Questions and thresholds** (what Jev is asked, and the wording of every option): `brain/jev_vs/questions.py` — the only file this project's prompt wording lives in.
-- **Brain ports, tick rate, model, timeouts:** `brain/config.toml`.
+- **Brain ports, model, timeouts:** `brain/config.toml`. The tick rate is *not* set here — the
+  plugin drives the cadence, so change `TickHz` in the plugin config below.
 - **Plugin timing, entity caps, run count, hotkey:** `<game>/BepInEx/config/dev.oldmoldycake.jevsurvivors.cfg` (named by the plugin's GUID, not by its display name — it won't appear as `JevSurvivors.cfg`). Key settings: `AutoplayOnBoot`, `MaxRuns` (0 = unlimited), `PauseBetweenRunsS`, `ToggleKey` (default `F9`), `TickHz`, `MaxEntities`.
 
 ## Develop
@@ -166,8 +177,10 @@ A few things worth knowing while it's running:
 - **Replay a run into the brain without the game**, useful for iterating on the dashboard or
   questions without launching Steam:
   ```bash
-  cd brain && uv run jev-vs &            # start the brain in one terminal
-  uv run --project brain python scripts/fake_plugin.py --replay runs/<stamp>
+  # one terminal, from the repository root:
+  (cd brain && uv run jev-vs)
+  # another terminal, also from the repository root:
+  uv run --project brain python scripts/fake_plugin.py --replay brain/runs/<stamp>
   # or, without a recorded run: uv run --project brain python scripts/fake_plugin.py --ticks 40 --hz 4
   ```
 - **Read game internals:** `scripts/decompile.sh` decompiles the game's logic assembly into
@@ -194,18 +207,36 @@ brain/                   Python package (uv), typesafe-sdk, pytest
     static/index.html    the dashboard page (inline CSS/JS, no build step)
   tests/
   runs/                  git-ignored run logs
-  config.toml            ports, tick rate, model, timeouts
+  config.toml            ports, model, timeouts (tick rate lives in the plugin config)
 mod/                     C# BepInEx plugin
   JevSurvivors/          Plugin.cs, Transport.cs, StateSampler.cs, Movement.cs, MenuDriver.cs, Patches.cs
-  Directory.Build.props  GameDir / BepInExDir / ManagedDir paths, override with GAME_DIR
+  Directory.Build.props  GameDir / BepInExDir / ManagedDir paths; pass GAME_DIR to
+                         deploy_mod.sh, or -p:GameDir=... to a bare dotnet build
 scripts/
   install_bepinex.sh     downloads and installs BepInEx 5 into the game folder
   deploy_mod.sh          builds the plugin and copies the DLL into BepInEx/plugins/
   decompile.sh           decompiles the game assembly into decompiled/ (git-ignored)
   fake_plugin.py         replays or synthesizes ticks against a running brain
   game_ctl.sh            launch/stop/watch the game from a terminal
-docs/superpowers/        design spec, implementation plans, and execution ledgers this
+docs/
+  README.md              index of the documents below
+  superpowers/           design spec, implementation plans, and execution ledgers this
                          project was built from (see below)
+.github/
+  workflows/ci.yml       lint + brain tests on every push and pull request
+  ISSUE_TEMPLATE/        bug report and feature request forms
+  PULL_REQUEST_TEMPLATE.md
+  CODEOWNERS
+  dependabot.yml         dependency update schedule
+CHANGELOG.md             what changed in each release
+CONTRIBUTING.md          how to build, test, and send a change
+CODE_OF_CONDUCT.md       ground rules for taking part
+SECURITY.md              how to report a vulnerability
+CLAUDE.md                repo conventions for AI coding agents
+LICENSE                  MIT
+.env.example             the environment variables the brain reads
+.editorconfig            shared indentation and whitespace settings
+.gitattributes           line-ending and diff settings
 ```
 
 ## Known limitations
@@ -229,7 +260,7 @@ More detail, including every deferred finding from the original build, is in
 ## Background / design docs
 
 This project was built with a spec-driven workflow, and the documents from that process are
-kept in the repo for transparency:
+kept in the repo for transparency — [`docs/README.md`](docs/README.md) indexes them:
 
 - [`docs/superpowers/specs/`](docs/superpowers/specs/) — the design doc, including every
   verified fact about the TypeSafe API and the decompiled game assembly it's based on.
@@ -243,7 +274,17 @@ it work this way."
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to build, test, and send a change, and
+[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) for the ground rules. Released versions and what
+changed in each are in [`CHANGELOG.md`](CHANGELOG.md).
+
+## Security
+
+Both servers this project starts (the plugin link on port 48231 and the dashboard on 48232)
+bind to `127.0.0.1` and are unauthenticated, so anything with an account on the same machine
+can drive them; the only secret involved is your TypeSafe API key, which belongs in a
+git-ignored `.env` and nowhere else. To report a vulnerability, see
+[`SECURITY.md`](SECURITY.md) rather than opening a public issue.
 
 ## License
 
