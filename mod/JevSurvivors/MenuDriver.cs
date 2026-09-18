@@ -170,6 +170,7 @@ namespace JevSurvivors
             }
             var box = Ask(Event("character_select", options));
             while (!box.Done) yield return null;
+            if (!CanAutomate() || page == null || !page.gameObject.activeInHierarchy) yield break;
             var pick = uis[PickIndex(box, uis.Count)];
             Plugin.Log.LogInfo($"character select: {pick.Type} ({(box.TimedOut ? "default" : "brain")})");
             page.ShowCharacterInfo(pick.CharacterItem.CharacterData, pick.Type, pick);
@@ -209,6 +210,7 @@ namespace JevSurvivors
             }
             var box = Ask(Event("weapon_select", options));
             while (!box.Done) yield return null;
+            if (!CanAutomate() || page == null || !page.gameObject.activeInHierarchy) yield break;
             var pick = items[PickIndex(box, items.Count)];
             Plugin.Log.LogInfo($"weapon select: {pick._type}");
             page.SelectWeapon(pick);
@@ -243,6 +245,7 @@ namespace JevSurvivors
             }
             var box = Ask(Event("stage_select", options));
             while (!box.Done) yield return null;
+            if (!CanAutomate() || page == null || !page.gameObject.activeInHierarchy) yield break;
             var pick = items[PickIndex(box, items.Count)];
             Plugin.Log.LogInfo($"stage select: {pick.Type}");
             page.SetInfoPanel(pick, pick.GetData(), pick.Type);
