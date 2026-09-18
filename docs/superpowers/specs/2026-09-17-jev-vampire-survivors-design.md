@@ -33,7 +33,7 @@ Success for v1:
 - Input is Rewired. The player controller keeps `_currentDirection`, `_currentDirectionRaw`, and `_lastMovementDirection` fields.
 - Classes verified by reading the assembly metadata:
   - `VampireSurvivors.Framework.GM` (static `Core`), `GameManager` (`_stage`, `_levelUpFactory`, `_gameSessionData`, `_playerOptions`, `_dataManager`, `AddStartingWeapon`, `RestartGameScene`), `EnemiesManager`, `LevelUpFactory` (`GetLevelUpItems`, `GetLevelUpOptions`), `WeaponsFacade`, `Loot.LootManager`.
-  - `VampireSurvivors.Objects.Characters.CharacterController` (`_currentHp`, `_level`, `_xp`, `_currentDirectionRaw`, `_currentDirection`, `_weaponsManager`, `_playerStats`, `CurrentHealth`, `ForceSetPosition`), `Objects.Characters.Enemies.EnemyController`.
+  - `VampireSurvivors.Objects.Characters.CharacterController` (`_currentHp`, `_level`, `_xp`, `_currentDirectionRaw`, `_currentDirection`, `_weaponsManager`, `_playerStats`, `CurrentHealth`, `ForceSetPosition`), `Objects.Characters.EnemyController`.
   - `VampireSurvivors.Objects.Stage` (`GetAllEnemiesInScreenBounds`, `GetAllGemsInScreenBounds`, `GetAllPickupsInScreenBounds`, `GetClosestEnemiesSorted`, `FindClosestEnemy`, `_currentMinute`, `_spawnedEnemies`), `Objects.Pickups.PickupManager`, `Objects.Items.Gem`.
   - `VampireSurvivors.Data.DataManager`.
   - UI pages: `UI.MainMenuPage` (`ShowCharacterSelect`, `_StartButton`), `UI.CharacterSelectionPage` (`_characterItemUIs`, `SelectCharacter`, `ForceSelectCharacter`, `ConfirmCharacter`, `StartButton`), `UI.StageSelectPage` (`GetAvailableStages`, `SelectStage`, `ConfirmStage`), `WeaponSelectionPage`, `UI.ArcanaMainSelectionPage` (`_SkipButton`, `_RandomButton`), `UI.LevelUpPage` (`_spawnedItems`, `SelectWeapon`, `SelectItem`, `Skip`, `Reroll`, `OnLevelUpPageIntroAnimComplete`, `get_LevelUpItems`), `LevelUpItemUI` (`_data`, `_itemData`, `_type`, `Select`, `IsWeapon`, `IsPowerUp`, `IsNew`), `UI.OpenTreasurePage`, `UI.ItemFoundPage`, `UI.CharacterFoundPage`, `UI.GameOverPage` (`Quit`, `OnShowStart`), `UI.RecapPage`, `UI.LandingScreenPage`, `SaveSlotsPage`, `UI.BaseUIPage`.
@@ -163,18 +163,18 @@ Responsibilities:
 - **Transport**: background thread owning the TCP connection, reconnecting on failure. Outgoing messages are queued from the Unity main thread; incoming replies are stored and consumed on the main thread. No Unity API is touched off the main thread.
 - **Tick sampler**: a MonoBehaviour that every `1 / tick_hz` seconds, while a run is active and automation is on, builds the tick state from `GM.Core`, its `Stage`, and the player `CharacterController`, and sends it.
 - **Movement**: a Harmony postfix on the player controller's per-frame input read overwrites `_currentDirectionRaw` and `_currentDirection` with the latest `move` vector while automation is on. The exact method is confirmed by decompilation in the first implementation task.
-- **Menu driver**: Harmony postfixes on `Start` of `LandingScreenPage` and on `OnShowStart` of `MainMenuPage`, `CharacterSelectionPage`, `WeaponSelectionPage`, `StageSelectPage`, `ArcanaMainSelectionPage`, `LevelUpPage` (after its intro animation completes), `OpenTreasurePage`, `ItemFoundPage`, `CharacterFoundPage`, `GameOverPage`, and `RecapPage`. Each waits a short configurable delay for the page to finish populating, gathers its options, sends the event, and applies the reply through the page's own methods (`ForceSelectCharacter` and `ConfirmCharacter`, `SelectStage` and `ConfirmStage`, the level-up item's `Select`, `Quit`, or the page's default confirm).
+- **Menu driver**: Harmony postfixes on `Start` of `LandingScreenPage` and on `OnShowStart` of `WarningPage`, `MainMenuPage`, `CharacterSelectionPage`, `WeaponSelectionPage`, `StageSelectPage`, `ArcanaMainSelectionPage`, `LevelUpPage` (after its intro animation completes), `OpenTreasurePage`, `ItemFoundPage`, `CharacterFoundPage`, `GameOverPage`, `RecapPage`, `PausePage`, and `MainGamePage`. Each waits a short configurable delay for the page to finish populating, gathers its options, sends the event, and applies the reply through the page's own methods (`ForceSelectCharacter` and `ConfirmCharacter`, `SelectStage` and `ConfirmStage`, the level-up item's `Select`, `Quit`, or the page's default confirm).
 - **Safety net**: any `BaseUIPage` subclass without a specific handler that stays open longer than `unknown_page_timeout_s` (default 10) gets its default confirm invoked, and the incident is logged.
 - **Kill switch**: F9 or a `control` message from the brain toggles automation. When off, movement and menu hooks do nothing and the human plays; ticks are still sent so the brain keeps logging and the dashboard keeps drawing.
-- **Config** (`BepInEx/config/JevSurvivors.cfg`): host, port, tick_hz, reply timeouts, max_entities, hotkey, autoplay_on_boot, max_runs (0 = unlimited), pause_between_runs_s.
+- **Config** (`BepInEx/config/dev.oldmoldycake.jevsurvivors.cfg`): host, port, tick_hz, reply timeouts, max_entities, hotkey, autoplay_on_boot, max_runs (0 = unlimited), pause_between_runs_s.
 
 ## 7. Run loop
 
-1. Game boots. The landing page ("press any key") is continued.
+1. Game boots. The warning page and the landing page (both "press any key") are continued in-process.
 2. Main menu shows. Plugin calls `ShowCharacterSelect`.
 3. Character select shows. Plugin sends the unlocked list, applies the pick, confirms. If a weapon selection page appears, the plugin sends a `weapon_select` event, which the brain answers with the level-up question.
 4. Stage select shows. Plugin sends available stages, applies the pick, confirms with default modifiers (no hyper, hurry, inverse, or endless).
-5. Run starts. Ticks flow; movement follows Jev. Level-up and arcana pages are answered. Treasure and unlock pages are dismissed.
+5. Run starts. Ticks flow; movement follows Jev. Level-up and arcana pages are answered. Treasure and unlock pages are dismissed. The pause page (the game pauses when its window loses focus) is resumed while automation is on.
 6. Game over shows. Plugin sends the summary, quits to the recap, confirms, and returns to the main menu.
 7. After `pause_between_runs_s`, step 2 repeats until `max_runs` is reached.
 

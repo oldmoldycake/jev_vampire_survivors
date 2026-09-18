@@ -12,6 +12,10 @@
 
 **Companion plan:** `docs/superpowers/plans/2026-09-17-jev-vs-brain.md`. Tasks 3 onward need a running brain (`cd brain && uv run jev-vs`).
 
+## Execution notes (2026-09-18)
+
+The game shows `WarningPage` and `PausePage`, which Tasks 5 and 6 handle. `OpenTreasurePage` needs `OpenTreasure()` pressed before it plays. The csproj needs `PauseSystem`, `PhaserPort`, and `Zenject` references. The config file is named by GUID: `BepInEx/config/dev.oldmoldycake.jevsurvivors.cfg`. `scripts/game_ctl.sh` exists for launching and stopping the game.
+
 ## Global Constraints
 
 - Game: Vampire Survivors 1.16.107, Unity 6000.0.62f1, native Linux Mono build at `~/.local/share/Steam/steamapps/common/Vampire Survivors`. Game logic assembly: `VampireSurvivors_Data/Managed/VampireSurvivors.Runtime.dll`.
