@@ -11,6 +11,7 @@ Success for v1:
 
 - From the main menu, a run starts, plays, and ends with zero human input, then another run starts.
 - Every Jev decision is logged with its probabilities, confidence, and latency.
+- A browser dashboard shows those decisions as they happen: every question as a card with a probability bar per option, the chosen option highlighted, confidence, latency, call count, and running cost, plus a radar of what the player sees.
 - The questions and thresholds live in one reviewable Python module.
 - If the brain or the Jev API is unavailable, the game keeps running on safe defaults and never stalls.
 
@@ -48,14 +49,18 @@ Steam ──launches──▶ Vampire Survivors (Unity Mono)
                                           │  newline-delimited JSON over TCP 127.0.0.1:48231
                                           ▼
                                    brain (Python, uv, typesafe-sdk)
-                                          │  HTTPS
-                                          ▼
-                                   api.typesafe.ai (jev-latest)
+                                     │                 │  HTTPS
+                                     │ HTTP + WebSocket ▼
+                                     │          api.typesafe.ai (jev-latest)
+                                     ▼
+                              browser dashboard (http://127.0.0.1:48232)
 ```
 
 **Plugin (`mod/`)** is thin on purpose: read raw state, apply actions, drive menus, keep the game alive when the brain is silent. It contains no strategy.
 
-**Brain (`brain/`)** owns everything that needs judgment or iteration: digesting raw state into words, the question definitions, calling Jev, fallbacks, and run logs. It can be restarted or edited without touching the game.
+**Brain (`brain/`)** owns everything that needs judgment or iteration: digesting raw state into words, the question definitions, calling Jev, fallbacks, run logs, and the live dashboard. It can be restarted or edited without touching the game.
+
+**Dashboard** is a single static page served by the brain and fed over a WebSocket. It has no logic of its own beyond rendering what the brain broadcasts.
 
 The brain is the TCP server and starts first. The plugin connects on load and reconnects every two seconds after any drop.
 
@@ -111,9 +116,11 @@ Enemies, gems, and pickups are those the game reports in screen bounds, sorted b
 {"id": 20, "type": "pick", "index": 1, "choice": "SPINACH", "probabilities": {"...": 0.0}, "confidence": 0.7, "source": "jev"}
 
 {"id": 22, "type": "noop"}
+
+{"type": "control", "automation": false}
 ```
 
-`source` is `jev` or `fallback` so logs show which decisions came from the model.
+`source` is `jev` or `fallback` so logs show which decisions came from the model. `control` has no id and is sent when the dashboard's pause or resume button is pressed; the plugin treats it exactly like the F9 hotkey.
 
 ## 5. Brain
 
@@ -158,7 +165,7 @@ Responsibilities:
 - **Movement**: a Harmony postfix on the player controller's per-frame input read overwrites `_currentDirectionRaw` and `_currentDirection` with the latest `move` vector while automation is on. The exact method is confirmed by decompilation in the first implementation task.
 - **Menu driver**: Harmony postfixes on `OnShowStart` of `LandingScreenPage`, `SaveSlotsPage`, `MainMenuPage`, `CharacterSelectionPage`, `WeaponSelectionPage`, `StageSelectPage`, `ArcanaMainSelectionPage`, `LevelUpPage` (after its intro animation completes), `OpenTreasurePage`, `ItemFoundPage`, `CharacterFoundPage`, `GameOverPage`, and `RecapPage`. Each waits a short configurable delay for the page to finish populating, gathers its options, sends the event, and applies the reply through the page's own methods (`ForceSelectCharacter` and `ConfirmCharacter`, `SelectStage` and `ConfirmStage`, the level-up item's `Select`, `Quit`, or the page's default confirm).
 - **Safety net**: any `BaseUIPage` subclass without a specific handler that stays open longer than `unknown_page_timeout_s` (default 10) gets its default confirm invoked, and the incident is logged.
-- **Kill switch**: F9 toggles automation. When off, movement and menu hooks do nothing and the human plays; ticks are still sent so the brain keeps logging.
+- **Kill switch**: F9 or a `control` message from the brain toggles automation. When off, movement and menu hooks do nothing and the human plays; ticks are still sent so the brain keeps logging and the dashboard keeps drawing.
 - **Config** (`BepInEx/config/JevSurvivors.cfg`): host, port, tick_hz, reply timeouts, max_entities, hotkey, autoplay_on_boot, max_runs (0 = unlimited), pause_between_runs_s.
 
 ## 7. Run loop
@@ -192,9 +199,25 @@ The brain writes `runs/<YYYYMMDD-HHMMSS>/`:
 - `events.jsonl`: every menu event and its answer, same fields.
 - `summary.json`: character, stage, seconds survived, level, kills, counts of jev versus fallback decisions, mean latency.
 
-The brain reads `brain/config.toml` (port, tick_hz, model, request timeout, retry policy, digest thresholds, log directory). The plugin reads its BepInEx config file.
+The brain reads `brain/config.toml` (plugin port, dashboard port, tick_hz, model, request timeout, retry policy, digest thresholds, log directory). The plugin reads its BepInEx config file.
 
-## 10. Testing
+## 10. Dashboard
+
+Modelled on TypeSafe's Doom demo: a dark "ops" page beside the game window, refreshed live, never polled.
+
+**Serving.** The brain runs an `aiohttp` app on `127.0.0.1:48232` (configurable). `GET /` returns one static HTML file with inline CSS and JavaScript, no build step. `GET /ws` upgrades to a WebSocket. Each browser client receives a `snapshot` message on connect (current run, latest decision per question, stats) and then a stream of `decision`, `tick`, `event`, `stats`, and `run` messages. The brain publishes to an in-process broadcast after every Jev answer, every fallback, every menu event, and every run start or end; tick digests are broadcast at most at `tick_hz`. A slow client is dropped rather than allowed to back up the brain.
+
+**Panels.**
+
+- Header: run id, character and stage, plugin and Jev connection status, calls this run, last and average latency, cost this run and projected cost per hour, jev versus fallback counts, and a pause/resume button that sends the `control` message.
+- Judgments column: one card per question kind (`direction`, `level_up`, `character`, `stage`), each showing the instructions text, a horizontal bar per option labelled with its probability, the chosen option highlighted, the confidence value, latency, and source. The direction card updates every tick; the others hold their last answer until the next event.
+- Radar: a canvas with the player at the centre, the eight sectors shaded by pressure level, enemies, gems, chests, and bosses as dots at their relative positions scaled to the screen extents, and an arrow for the chosen direction. Drawn from the same digest and raw entities the brain used, so what the viewer sees is what Jev was told.
+- Status strip: HP bucket and value, level, minute, current weapons and passives.
+- Log: the last 50 events (level-ups, picks, fallbacks, page dismissals) and a table of previous run summaries from this session.
+
+**Out of v1.** Embedding the live game video in the page. The game window sits beside the browser. Wayland screen capture into a browser stream is a separate pipeline and is listed as a stretch item in section 13.
+
+## 11. Testing
 
 **Spike first (blocking everything else).** Install BepInEx 5.4.23.5 Linux x64 into the game folder, set the Steam launch option `./run_bepinex.sh %command%`, boot the game, and confirm the BepInEx console shows the Unity 6 Mono runtime loaded. Then build a hello-world plugin with one Harmony postfix that logs the player's position each second during a run. This settles the target framework, publicizer setup, and whether BepInEx 5 is viable on this Unity version; if it is not, the fallback is BepInEx 6 pre-release (UnityMono) and the rest of the design is unchanged.
 
@@ -204,6 +227,8 @@ The brain reads `brain/config.toml` (port, tick_hz, model, request timeout, retr
 - Unit tests for answer application: every direction name maps to the right unit vector; picks map to indices; malformed answers fall back.
 - Protocol tests: a fake plugin client (`scripts/fake_plugin.py`, also usable by hand) sends recorded ticks and events over TCP and asserts the reply shape, id echoing, and timeouts, with the Jev client mocked.
 - Live replay tests marked `live`: feed recorded ticks from `runs/` to the real API and assert the responses are well-formed and within latency budget. Skipped unless `TYPESAFE_API_KEY` is set and `-m live` is passed.
+- Dashboard tests: `GET /` serves the page, a WebSocket client receives a `snapshot` on connect and a `decision` message after the brain records an answer, a pause click produces a `control` message to the fake plugin, and a stalled client is dropped without delaying decisions.
+- Visual check: run `scripts/fake_plugin.py` against a recorded run with Jev mocked and confirm the cards, bars, and radar animate in the browser.
 
 **Plugin.**
 
@@ -213,7 +238,7 @@ The brain reads `brain/config.toml` (port, tick_hz, model, request timeout, retr
 
 Unity code is not unit tested; that is why the plugin holds no logic worth testing.
 
-## 11. Repository layout and tooling
+## 12. Repository layout and tooling
 
 ```
 jev_vampire_survivors/
@@ -224,6 +249,8 @@ jev_vampire_survivors/
       questions.py       all Jev questions and thresholds (the file humans review)
       jev_client.py      TypeSafe SDK wrapper, retries, fallback marking
       runlog.py          JSONL writers
+      dashboard.py       aiohttp app, WebSocket broadcast, stats
+      static/index.html  the dashboard page (inline CSS and JS)
     tests/
     config.toml
   mod/                   C# BepInEx plugin
@@ -245,11 +272,11 @@ Prerequisites the user installs or sets:
 - `TYPESAFE_API_KEY` exported in the shell that runs the brain.
 - `uv` is already installed; Python 3.14 is present.
 
-## 12. Out of scope for v1
+## 13. Out of scope for v1
 
-In-game overlay of Jev's decisions, co-op and online modes, adventures mode, merchant purchases, reroll/skip/banish strategy at level-up (Jev only picks among the offered items), evolution planning beyond what the option descriptions convey, stage modifiers (hyper, hurry, inverse, endless), and any tick rate above 4 Hz.
+In-game overlay drawn by the mod, live game video embedded in the dashboard (stretch: a Wayland PipeWire capture piped by ffmpeg to an MJPEG endpoint on the brain), co-op and online modes, adventures mode, merchant purchases, reroll/skip/banish strategy at level-up (Jev only picks among the offered items), evolution planning beyond what the option descriptions convey, stage modifiers (hyper, hurry, inverse, endless), and any tick rate above 4 Hz.
 
-## 13. Items resolved during implementation
+## 14. Items resolved during implementation
 
 These depend on reading decompiled method bodies and are settled in the first implementation task, not in this spec:
 
@@ -259,7 +286,7 @@ These depend on reading decompiled method bodies and are settled in the first im
 - Which confirm method each dismissable page exposes.
 - The plugin target framework and whether the publicizer is needed, both decided by the spike.
 
-## 14. References
+## 15. References
 
 - TypeSafe docs: quickstart, primitives/choice, concepts/state, models, patterns/fan-out, primitives/advanced, model-jaggedness/jev-1.13, sdk/python/usage (https://docs.typesafe.ai/).
 - TypeSafe launch post: https://typesafe.ai/blog/introducing-system-one-models-and-jev
