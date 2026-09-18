@@ -17,7 +17,16 @@ namespace JevSurvivors
         private readonly Transport _t;
         private float _next;
 
+        /// <summary>World position at the previous tick, or null when we have none yet (first tick of a session or of a run).
+        /// A null here must report a large sentinel distance, never zero, so "we do not know" can't look like "did not move".</summary>
+        private static Vector3? _prevPos;
+
+        private const float UnknownMovedSentinel = 999f;
+
         public StateSampler(Transport t) { _t = t; }
+
+        /// <summary>Forgets the previous tick's position so the first tick of a new run never compares against the last run's final spot.</summary>
+        public static void ResetTracking() => _prevPos = null;
 
         public static bool RunActive()
         {
@@ -43,6 +52,8 @@ namespace JevSurvivors
             var p = gm.Player;
             var stage = gm.Stage;
             Vector3 pp = p.transform.position;
+            float moved = _prevPos.HasValue ? R(Vector3.Distance(pp, _prevPos.Value)) : UnknownMovedSentinel;
+            _prevPos = pp;
             Camera cam = stage._mainCamera != null ? stage._mainCamera : Camera.main;
             Bounds b = cam.OrthographicBounds();
             int cap = Plugin.MaxEntities.Value;
@@ -89,6 +100,8 @@ namespace JevSurvivors
                         ["minute"] = stage.CurrentMinute, ["seconds"] = R(gm.SurvivedSeconds),
                         ["character"] = p.CharacterType.ToString(),
                         ["weapons"] = Equip(p.WeaponsManager), ["passives"] = Equip(p.AccessoriesManager),
+                        ["applied_direction"] = string.IsNullOrEmpty(Movement.LastChoice) ? null : Movement.LastChoice,
+                        ["moved"] = moved,
                     },
                     ["enemies"] = Nearest(enemies, cap, (dx, dy, e) => new JObject
                     {

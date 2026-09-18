@@ -77,7 +77,8 @@ One JSON object per line, UTF-8. Every plugin message that expects an answer car
  "state": {
    "player": {"x": 0.0, "y": 0.0, "hp": 71, "max_hp": 120, "level": 9, "xp": 40, "xp_to_next": 85,
               "minute": 6, "seconds": 391, "character": "ANTONIO",
-              "weapons": [{"id": "WHIP", "level": 4}], "passives": [{"id": "SPINACH", "level": 2}]},
+              "weapons": [{"id": "WHIP", "level": 4}], "passives": [{"id": "SPINACH", "level": 2}],
+              "applied_direction": "north", "moved": 0.42},
    "enemies": [{"x": 3.1, "y": -0.4, "hp": 12, "type": "BAT", "boss": false}],
    "gems": [{"x": -1.2, "y": 2.0, "value": 1}],
    "pickups": [{"x": 5.0, "y": 5.0, "kind": "CHEST"}],
@@ -104,6 +105,8 @@ One JSON object per line, UTF-8. Every plugin message that expects an answer car
 ```
 
 Enemies, gems, and pickups are those the game reports in screen bounds, sorted by distance to the player, capped at `max_entities` (default 200 each). Positions are Unity world units relative to the player, and `screen` gives the half extents of the visible area in the same units so the brain can bucket distances relative to what is on screen. `t` is seconds since the run started.
+
+`applied_direction` is the direction word the plugin is currently applying, and `moved` is how far the player actually travelled since the previous tick, so the brain can mark a direction blocked when the player is walking into a tree, a wall or the map edge.
 
 `level_up` and `weapon_select` options share one shape. The plugin sets `evolution_ready: true` on a weapon option when every entry in that weapon's `WeaponData.evoSynergy` list is already among the player's active weapons or passives (the game's own `LevelUpFactory.HasEvolutionRequirements` is private and judges the evolved weapon, not the offered one, so the plugin does this small check itself); the brain only phrases that flag, it never computes it.
 
@@ -133,6 +136,8 @@ The brain never forwards raw coordinates to Jev. Per tick it:
 3. Computes per sector: enemy pressure (`none`, `light`, `moderate`, `heavy`) from a distance-weighted count, nearest enemy bucket, gem count bucket (`none`, `few`, `many`), and flags for `boss` and `chest`.
 4. Buckets player HP (`critical` < 25%, `low` < 50%, `ok` < 90%, `full`).
 
+A sector is marked `blocked` when the plugin reports that direction as `applied_direction` and the player barely moved, and the direction question is told never to choose a blocked sector. The player's experience progress is likewise bucketed into words and given to the direction question. Pickups are classified into word categories (`chest`, `coffin unlock`, `relic`, `healing`, `power-up`, `coins`, `item`) rather than a single `chest` flag.
+
 The exact bucket thresholds are constants in `brain/jev_vs/questions.py` next to the questions they feed.
 
 ### Questions (all in `brain/jev_vs/questions.py`)
@@ -143,6 +148,8 @@ The exact bucket thresholds are constants in `brain/jev_vs/questions.py` next to
 - **stage** (per run): `Choice` over unlocked stages with in-game descriptions.
 
 Every answer is applied by code: the direction name maps to a unit vector, the pick maps to an option index. Jev never sees or produces numbers it has to reason about.
+
+Character and stage picks are sampled from Jev's own probability distribution above a small floor, and the last five runs' characters and stages are shown to Jev so it varies its choices instead of repeating the same run.
 
 ### Cadence and budget
 

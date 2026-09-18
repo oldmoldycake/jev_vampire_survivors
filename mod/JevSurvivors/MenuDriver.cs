@@ -307,6 +307,7 @@ namespace JevSurvivors
         public void OnRunStarted(MainGamePage page)
         {
             Movement.Clear();
+            StateSampler.ResetTracking();
             RunsStarted++;   // counts an actual run start, not just a character confirm that might not reach gameplay
             var gm = GM.Core;
             Plugin.Log.LogInfo($"run started: {gm?.Player?.CharacterType} on {gm?.PlayerOptions?.Config?.SelectedStage}");
