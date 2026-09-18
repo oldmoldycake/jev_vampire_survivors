@@ -1,0 +1,95 @@
+name: Game update or port
+description: A Vampire Survivors update broke something, or you're porting to another platform
+labels: ["compat"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The two most likely ways this project breaks, both called out in the README:
+
+        - **A game update moved something.** The plugin reaches into the game's private fields and
+          methods *by name*, through Harmony patches and a publicizer — not through any public
+          modding API. A rename or a signature change upstream breaks it.
+        - **A port.** Windows ships an IL2CPP build (different runtime, different BepInEx flavor,
+          different tooling); macOS was never investigated.
+
+        Either way, `scripts/decompile.sh` is the starting point: it decompiles
+        `VampireSurvivors.Runtime.dll` into `./decompiled` with ilspycmd so you can find what the
+        member is called now. The hook points worth checking first are in
+        `mod/JevSurvivors/Patches.cs` (`BaseUIPage.OnShowStart` / `OnHideStart`,
+        `LevelUpPage.EnableLevelupOptions`, the various `*Page` classes) and
+        `mod/JevSurvivors/Movement.cs` (`VsCharacter.ProcessRawDirection`).
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Which is this
+      options:
+        - A game update broke something that used to work
+        - Porting to Windows (IL2CPP)
+        - Porting to macOS
+        - A BepInEx, Unity, or .NET version change broke the build
+        - Something else compatibility-related
+    validations:
+      required: true
+
+  - type: input
+    id: game-version
+    attributes:
+      label: Game version / build you're on
+      description: And the Unity version if you know it. The plugin was built against 1.16.107 on Unity 6000.0.62f1.
+    validations:
+      required: true
+
+  - type: input
+    id: last-working
+    attributes:
+      label: Last version where it worked
+      description: If you know it. Leave blank for a port.
+    validations:
+      required: false
+
+  - type: textarea
+    id: symptom
+    attributes:
+      label: What breaks, concretely
+      description: >-
+        The exception, the missing type or member, the build error, or the behavior that silently
+        stopped (menus not advancing, no movement, plugin never loads). Paste the failing lines
+        from `<game>/BepInEx/LogOutput.log` or the build output.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: decompiled
+    attributes:
+      label: What the decompiler shows
+      description: >-
+        Run `scripts/decompile.sh` and paste the current declaration of whatever moved — the class,
+        method signature, or field this project expects but can no longer find. This is the single
+        most useful thing you can put in this issue; with it, the fix is usually a one-line change
+        in the matching C# file.
+      render: csharp
+    validations:
+      required: false
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you've tried, and what you're offering
+      description: >-
+        Patches you've already made locally, whether you're looking for a pointer or intending to
+        open a PR, and — for a port — how far you got and where you're stuck.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before you submit
+      options:
+        - label: I removed my TypeSafe API key and anything else private from the output above.
+          required: true
+        - label: I agree to follow this project's [Code of Conduct](https://github.com/OldMoldyCake/jev_vampire_survivors/blob/main/CODE_OF_CONDUCT.md).
+          required: true

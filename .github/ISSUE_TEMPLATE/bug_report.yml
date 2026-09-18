@@ -1,0 +1,134 @@
+name: Bug report
+description: Something in the plugin, the brain, or the dashboard doesn't work
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two things worth checking before you fill this in:
+
+        - **This is Linux-only.** Native Linux Steam builds of Vampire Survivors, no Proton
+          prefix. Windows and macOS aren't supported as shipped — see
+          [Platform support](https://github.com/OldMoldyCake/jev_vampire_survivors#platform-support).
+          If you're porting, or a game update broke something that used to work, use the
+          **Game update or port** template instead.
+        - **Scrub your logs.** The last field on this form is a promise that you did.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead. One or two paragraphs is plenty.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: >-
+        Include anything non-default: a changed `config.toml`, a different `GAME_DIR`, no API key
+        set (so every decision is the fallback heuristic), automation toggled off with F9.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which part is misbehaving
+      description: Best guess is fine.
+      options:
+        - Brain (Python) — decisions, questions, fallbacks, run logs
+        - Plugin (C#) — hooks, movement, menu driving
+        - Dashboard — the page at 127.0.0.1:48232
+        - Setup scripts — install_bepinex.sh, deploy_mod.sh, decompile.sh, game_ctl.sh
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: game-version
+    attributes:
+      label: Vampire Survivors version
+      description: >-
+        The plugin was built and tested against 1.16.107 (Unity 6000.0.62f1). If yours is newer,
+        say so — a game update is the single most likely cause of a hook breaking.
+      value: "1.16.107"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: How are you running the game
+      description: >-
+        The Windows Steam depot ships an IL2CPP build, which needs a different flavor of BepInEx
+        and different tooling; it is not what this plugin targets.
+      options:
+        - Native Linux Steam build (supported)
+        - Linux via Steam Play / Proton (unsupported)
+        - Windows (unsupported)
+        - macOS (unsupported)
+    validations:
+      required: true
+
+  - type: input
+    id: distro
+    attributes:
+      label: Distro and kernel
+      description: Output of `uname -sr` plus whatever your distro calls itself. Optional, but it helps for script bugs.
+      placeholder: "Arch, Linux 6.10.6"
+    validations:
+      required: false
+
+  - type: textarea
+    id: bepinex-log
+    attributes:
+      label: Relevant excerpt from BepInEx/LogOutput.log
+      description: >-
+        `<game>/BepInEx/LogOutput.log`. Don't paste the whole file — the lines around the failure,
+        plus the `JevSurvivors` startup lines, are what's useful. If the plugin never loaded, say
+        that and paste the first 40 lines.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: brain-output
+    attributes:
+      label: Brain console output
+      description: >-
+        The terminal running `uv run jev-vs`. Warnings like `jev <name> failed: ...` or
+        `TYPESAFE_API_KEY is not set` are the interesting ones. Re-run with `--log-level DEBUG` if
+        nothing obvious shows up.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: anything-else
+    attributes:
+      label: Anything else
+      description: >-
+        Screenshot of the dashboard, a `brain/runs/<stamp>/summary.json`, what you already tried.
+        Run logs contain full game state and model responses — skim before attaching.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before you submit
+      options:
+        - label: >-
+            I checked everything I pasted above for my TypeSafe API key (and anything else I'd
+            rather not publish) and removed it.
+          required: true
+        - label: I'm on current `main`, or I said which commit I'm on.
+          required: false
+        - label: I agree to follow this project's [Code of Conduct](https://github.com/OldMoldyCake/jev_vampire_survivors/blob/main/CODE_OF_CONDUCT.md).
+          required: true

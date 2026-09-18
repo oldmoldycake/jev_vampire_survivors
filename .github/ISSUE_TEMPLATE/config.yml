@@ -1,0 +1,14 @@
+# MAINTAINER: the Discussions link below 404s until Discussions is enabled for this repository
+# (Settings -> General -> Features -> Discussions). Enable it, or delete that contact link.
+blank_issues_enabled: false
+contact_links:
+  - name: Question, setup help, or general discussion
+    url: https://github.com/OldMoldyCake/jev_vampire_survivors/discussions
+    about: >-
+      Not sure whether it's a bug? Stuck on setup, wondering if some behavior is intended, or
+      want to share a run or a questions.py tweak? Start here.
+  - name: Report a security issue privately
+    url: https://github.com/OldMoldyCake/jev_vampire_survivors/security/advisories/new
+    about: >-
+      Don't open a public issue for something exploitable. See SECURITY.md, which also documents
+      what this software does to your machine.
