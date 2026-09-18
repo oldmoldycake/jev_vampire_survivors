@@ -92,7 +92,8 @@ game assembly so you can find the new member names and update the matching C# fi
 Install once, in any order:
 
 - **Vampire Survivors**, purchased and installed via Steam, with Steam running.
-- **`curl` and `unzip`**, used by `scripts/install_bepinex.sh` (present on most distros already).
+- **`curl`, `unzip` and `sha256sum`**, used by `scripts/install_bepinex.sh` (present on most
+  distros already).
 - **[uv](https://github.com/astral-sh/uv)** — runs and manages the Python brain. Python 3.12+
   is pulled in by `uv` automatically; you don't need to install Python yourself.
 - **.NET 8 SDK**, to build the C# plugin:

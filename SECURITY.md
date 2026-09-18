@@ -59,19 +59,23 @@ this plugin. To back out: delete `<game>/BepInEx/plugins/JevSurvivors/` to remov
 clear the Steam launch option (`./run_bepinex.sh %command%`) and the game starts with no BepInEx
 at all.
 
-### The BepInEx installer does not verify what it downloads
+### The BepInEx installer downloads code that runs at every game launch
 
 `scripts/install_bepinex.sh` fetches `BepInEx_linux_x64_<version>.zip` from the BepInEx GitHub
 release page over HTTPS and unzips it directly into your Steam game folder, then makes
-`run_bepinex.sh` executable and points its `executable_name` at `VampireSurvivors.exe`.
+`run_bepinex.sh` executable and points its `executable_name` at `VampireSurvivors.exe`. From then
+on that script runs every time you launch the game through Steam.
 
-**It does not verify a checksum or a signature.** The only integrity guarantee is TLS plus
-GitHub's release hosting — there is no pinned hash in the script, so a compromised or substituted
-artifact would be installed without complaint. This is a known gap, stated here rather than
-papered over. If that isn't good enough for you, skip the script: download the release yourself,
-check it against the hashes BepInEx publishes, and unzip it into the game folder by hand — the
-script does nothing else of substance. A PR that pins and verifies a SHA-256 (while still
-allowing `BEPINEX_VERSION` to be overridden) would be welcome.
+**The archive's SHA-256 is pinned in the script and verified before anything is unpacked.** The
+pinned digest covers the default version and matches the digest GitHub publishes for that release
+asset; on a mismatch the script refuses to install and unpacks nothing. Because the pin is tied to
+one version, overriding `BEPINEX_VERSION` leaves the script with no hash it can trust, so it stops
+and asks you to either supply `BEPINEX_SHA256=<sha256>` for that release or set
+`BEPINEX_ALLOW_UNVERIFIED=1` to knowingly skip the check.
+
+This narrows the trust to the pinned hash itself: it was taken from GitHub's published digest for
+the asset, so it is only as good as that release. If you want to check it independently, compare
+`PINNED_SHA256` in the script against the hash on BepInEx's own release page before running it.
 
 Two related notes, same trust model as any package install: `scripts/decompile.sh` will run
 `dotnet tool install -g ilspycmd` from NuGet if `ilspycmd` isn't already on your `PATH`, and

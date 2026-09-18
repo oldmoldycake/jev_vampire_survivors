@@ -68,6 +68,16 @@ dashboard showing each decision as it is made.
 
 Issues found and closed during the initial build, before this release shipped:
 
+- `scripts/install_bepinex.sh` now pins and verifies the BepInEx archive's SHA-256 before
+  unpacking anything into the game folder, instead of trusting the download.
+- `scripts/decompile.sh` validates that the game assembly exists before installing a global
+  dotnet tool and deleting any previous decompile output.
+- `scripts/game_ctl.sh wait-log` with no pattern prints its usage instead of failing with an
+  unbound-variable error.
+- Corrected the documented replay command, which pointed at a path that could not resolve from
+  the directory the README told you to run it in.
+- `brain/config.toml` no longer presents `tick_hz` as the tick-rate control; the plugin's
+  `TickHz` is the setting that takes effect.
 - A revived run is no longer counted twice against the run budget.
 - The offline fallback direction now respects blocked directions instead of walking into
   scenery, and the steering instructions given to the model were clarified.
