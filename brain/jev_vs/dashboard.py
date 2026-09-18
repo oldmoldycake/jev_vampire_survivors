@@ -49,6 +49,8 @@ def make_app(server: PluginServer) -> web.Application:
                     "log": server.recent_log,
                     "run": server.current_run,
                     "runs": server.run_history,
+                    "pins": server.pins.pins,
+                    "rosters": server.pins.rosters,
                 }
             )
         )
@@ -78,6 +80,12 @@ def make_app(server: PluginServer) -> web.Application:
                     continue
                 if data.get("type") == "control":
                     await server.send_control(bool(data.get("automation", True)))
+                elif data.get("type") == "pin":
+                    kind, pin = data.get("kind"), data.get("id")
+                    # Same trust model as control: loopback, unauthenticated, and a pin is
+                    # strictly less powerful than the pause button. Shape-check and drop.
+                    if isinstance(kind, str) and (pin is None or isinstance(pin, str)):
+                        server.set_pin(kind, pin)
         finally:
             server.hub.unsubscribe(q)
             pump_task.cancel()

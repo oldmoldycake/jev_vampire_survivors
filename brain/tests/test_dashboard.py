@@ -126,3 +126,51 @@ async def test_snapshot_includes_run_history(client, plugin_server):
     snap = json.loads((await ws.receive()).data)
     assert snap["runs"][0]["character"] == "IMELDA"
     await ws.close()
+
+
+async def _wait_for(predicate, timeout=2.0):
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
+        if predicate():
+            return True
+        await asyncio.sleep(0.01)
+    return False
+
+
+async def test_index_offers_a_character_and_a_stage_select(client):
+    body = await (await client.get("/")).text()
+    assert 'id="pin-character"' in body and 'id="pin-stage"' in body
+    assert "JEV DECIDES" in body
+
+
+async def test_snapshot_carries_pins_and_rosters(client, plugin_server):
+    plugin_server.pins.set_pin("character", "ANTONIO")
+    plugin_server.pins.remember_options("stage", [{"id": "FOREST", "name": "Mad Forest"}])
+    ws = await client.ws_connect("/ws")
+    snap = json.loads((await ws.receive()).data)
+    assert snap["pins"] == {"character": "ANTONIO", "stage": None}
+    assert snap["rosters"]["stage"] == [{"id": "FOREST", "name": "Mad Forest"}]
+    await ws.close()
+
+
+async def test_ws_pin_message_reaches_the_store_and_can_clear_it(client, plugin_server):
+    ws = await client.ws_connect("/ws")
+    await ws.receive()  # snapshot
+    await ws.send_str(json.dumps({"type": "pin", "kind": "character", "id": "IMELDA"}))
+    assert await _wait_for(lambda: plugin_server.pins.pin_for("character") == "IMELDA")
+    await ws.send_str(json.dumps({"type": "pin", "kind": "character", "id": None}))
+    assert await _wait_for(lambda: plugin_server.pins.pin_for("character") is None)
+    await ws.close()
+
+
+async def test_ws_ignores_a_malformed_pin_message(client, plugin_server):
+    ws = await client.ws_connect("/ws")
+    await ws.receive()  # snapshot
+    await ws.send_str(json.dumps({"type": "pin", "kind": 7, "id": "ANTONIO"}))
+    await ws.send_str(json.dumps({"type": "pin", "kind": "character", "id": 12}))
+    await ws.send_str(json.dumps({"type": "pin", "kind": "stage", "id": "FOREST"}))
+    # the good one lands, which proves the bad two were dropped rather than fatal
+    assert await _wait_for(lambda: plugin_server.pins.pin_for("stage") == "FOREST")
+    assert plugin_server.pins.pin_for("character") is None
+    await ws.close()

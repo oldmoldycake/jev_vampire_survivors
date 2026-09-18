@@ -57,7 +57,13 @@
     border:0; box-shadow:inset 0 -3px 0 var(--gold-dim);
   }
   button.paused { background:var(--blood); color:var(--bone); box-shadow:inset 0 -3px 0 #7d2418; }
-  button:focus-visible, canvas:focus-visible { outline:2px solid var(--xp); outline-offset:2px; }
+  button:focus-visible, canvas:focus-visible, select:focus-visible { outline:2px solid var(--xp); outline-offset:2px; }
+  .pin { display:inline-flex; align-items:center; gap:5px; color:var(--dim); font:400 11px/1 var(--pixel); }
+  .pin select {
+    padding:3px 5px; max-width:150px; border:0;
+    font:12px/1.3 var(--data); color:var(--bone); background:var(--void);
+    box-shadow:inset 0 0 0 1px var(--gold-dim);
+  }
 
   main { display:grid; grid-template-columns:minmax(320px,440px) 1fr; gap:12px; padding:12px 14px; align-items:start; }
   .col { display:grid; gap:12px; align-content:start; }
@@ -106,6 +112,8 @@
     <span class="brand">JEV SURVIVORS</span>
     <span class="lamp" id="dot-plugin"><i></i>plugin</span>
     <span class="lamp" id="dot-jev"><i></i>jev</span>
+    <label class="pin">character<select id="pin-character"><option value="">JEV DECIDES</option></select></label>
+    <label class="pin">stage<select id="pin-stage"><option value="">JEV DECIDES</option></select></label>
     <button id="pause">PAUSE</button>
   </div>
   <div class="chips">
@@ -160,6 +168,8 @@
   const PRESSURE_ALPHA = { none:0, light:0.14, moderate:0.34, heavy:0.58 };
   const XP_FRACTION = { "just levelled":0.12, "partway to the next level":0.42, "close to the next level":0.72, "a level up is imminent":0.95 };
   let automation = true;
+  const pins = { character: null, stage: null };
+  const rosters = { character: [], stage: [] };
   const $ = (id) => document.getElementById(id);
   const trim = (s, n) => {
     const t = String(s || "").trim();
@@ -182,6 +192,19 @@
     $("s-jev").textContent = s.jev_calls ?? 0;
     $("s-fb").textContent = s.fallback_calls ?? 0;
     $("s-re").textContent = s.reused ?? 0;
+  }
+
+  function renderPins() {
+    Object.keys(pins).forEach(kind => {
+      const sel = $(`pin-${kind}`), chosen = pins[kind] || "", seen = rosters[kind] || [];
+      const opts = [`<option value="">JEV DECIDES</option>`]
+        .concat(seen.map(o => `<option value="${esc(o.id)}">${esc(o.name || o.id)}</option>`));
+      // A pin set before this menu was ever seen still needs a row, or the select would
+      // silently snap back to JEV DECIDES and lie about what the brain will do.
+      if (chosen && !seen.some(o => o.id === chosen)) opts.push(`<option value="${esc(chosen)}">${esc(chosen)}</option>`);
+      sel.innerHTML = opts.join("");
+      sel.value = chosen;
+    });
   }
 
   function card(kind) {
@@ -307,10 +330,15 @@
         Object.values(m.decisions || {}).forEach(renderDecision);
         (m.log || []).slice().reverse().forEach(addLog);
         (m.runs || []).forEach(addRun);
+        Object.assign(pins, m.pins || {});
+        Object.assign(rosters, m.rosters || {});
+        renderPins();
         $("s-run").textContent = (m.run && m.run.character) || "—";
       } else if (m.type === "stats") renderStats(m);
       else if (m.type === "decision") renderDecision(m);
       else if (m.type === "event") addLog(m);
+      else if (m.type === "roster") { rosters[m.kind] = m.options || []; renderPins(); }
+      else if (m.type === "pin") { pins[m.kind] = m.id; renderPins(); }
       else if (m.type === "run") {
         if (m.phase === "end") addRun(m.summary);
         $("s-run").textContent = m.phase === "start" ? "starting" : "—";
@@ -325,6 +353,14 @@
     $("pause").classList.toggle("paused", !automation);
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "control", automation }));
   };
+
+  Object.keys(pins).forEach(kind => {
+    $(`pin-${kind}`).onchange = (ev) => {
+      const id = ev.target.value || null;
+      pins[kind] = id;
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "pin", kind, id }));
+    };
+  });
   connect();
 })();
 </script>
