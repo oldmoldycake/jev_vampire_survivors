@@ -1,0 +1,43 @@
+# Editor defaults for this repo. https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# The Python brain. Matches [tool.ruff] in brain/pyproject.toml.
+[*.py]
+indent_size = 4
+max_line_length = 120
+
+# The BepInEx plugin.
+[*.cs]
+indent_size = 4
+
+[*.{csproj,props,targets,xml}]
+indent_size = 2
+
+[*.sh]
+indent_size = 2
+
+[*.toml]
+indent_size = 4
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.json]
+indent_size = 2
+
+# The dashboard page served by brain/jev_vs/static.
+[*.{html,css,js}]
+indent_size = 2
+
+# Two trailing spaces are a line break in Markdown, so leave them be.
+[*.md]
+indent_size = 2
+trim_trailing_whitespace = false

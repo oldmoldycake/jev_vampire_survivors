@@ -6,8 +6,12 @@ decompiled/
 __pycache__/
 *.pyc
 .pytest_cache/
+.ruff_cache/
 # dotnet
 mod/**/bin/
 mod/**/obj/
+# local agent/editor state (a shared .claude/settings.json stays committable)
+.claude/settings.local.json
+.claude/worktrees/
 # secrets
 .env

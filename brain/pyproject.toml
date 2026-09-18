@@ -15,7 +15,19 @@ jev-vs = "jev_vs.__main__:main"
 dev = [
     "pytest>=9",
     "pytest-asyncio>=1.4",
+    "ruff>=0.16",
 ]
+
+[tool.ruff]
+target-version = "py312"
+# The brain is written wide on purpose: lookup tables, wire-format dict literals and
+# log lines. Measured over the package and tests, 99% of lines already fit in 120.
+line-length = 120
+
+[tool.ruff.lint]
+# Pragmatic and explicit: pycodestyle errors, pyflakes, import sorting, pyupgrade,
+# and the bugbear traps. No preview rules and nothing that wants type annotations.
+select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

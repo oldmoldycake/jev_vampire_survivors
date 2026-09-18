@@ -1,0 +1,11 @@
+# Normalise to LF in the repository, whatever the checkout platform does.
+* text=auto eol=lf
+
+# Shell scripts break outright with CRLF.
+*.sh text eol=lf
+
+# Resolved by uv; not hand-written, so keep it out of language stats and diffs.
+brain/uv.lock linguist-generated=true
+
+# Plugin build output. Git-ignored, but never line-ending-mangle one that slips in.
+*.dll binary
