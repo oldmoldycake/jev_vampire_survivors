@@ -1,5 +1,6 @@
-# run logs and decompiled game code
+# run logs, saved pins and decompiled game code
 runs/
+pins.json
 decompiled/
 # python
 .venv/

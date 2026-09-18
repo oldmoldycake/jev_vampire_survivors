@@ -18,6 +18,7 @@ class Config:
     request_timeout_s: float = 0.8
     max_retries: int = 1
     log_dir: str = "runs"
+    state_file: str = "pins.json"
 
 
 def load_config(path: Path | None) -> Config:
@@ -39,4 +40,5 @@ def load_config(path: Path | None) -> Config:
         request_timeout_s=float(brain.get("request_timeout_s", cfg.request_timeout_s)),
         max_retries=int(brain.get("max_retries", cfg.max_retries)),
         log_dir=str(brain.get("log_dir", cfg.log_dir)),
+        state_file=str(brain.get("state_file", cfg.state_file)),
     )

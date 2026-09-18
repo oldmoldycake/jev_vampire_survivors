@@ -16,3 +16,6 @@ model = "jev-latest"
 request_timeout_s = 0.8
 max_retries = 1
 log_dir = "runs"
+# Dashboard pins (character/stage) and the menu rosters behind their dropdowns.
+# Relative to the working directory, exactly like log_dir.
+state_file = "pins.json"
