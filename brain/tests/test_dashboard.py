@@ -1,6 +1,7 @@
 import asyncio
 import json
 
+import aiohttp
 import pytest
 from aiohttp import WSMsgType
 from aiohttp.test_utils import TestClient, TestServer
@@ -84,6 +85,16 @@ async def test_ws_ignores_non_object_json(client, plugin_server):
     line = json.loads(await asyncio.wait_for(reader.readline(), 2))
     assert line == {"type": "control", "automation": False}
     writer.close()
+    await ws.close()
+
+
+async def test_ws_rejects_foreign_origin_but_allows_own_host(client, plugin_server):
+    with pytest.raises(aiohttp.WSServerHandshakeError) as exc_info:
+        await client.ws_connect("/ws", headers={"Origin": "http://evil.example"})
+    assert exc_info.value.status == 403
+    ws = await client.ws_connect("/ws", headers={"Origin": f"http://{client.host}:{client.port}"})
+    snap = json.loads((await ws.receive()).data)
+    assert snap["type"] == "snapshot"
     await ws.close()
 
 

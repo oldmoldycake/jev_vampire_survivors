@@ -55,6 +55,13 @@ def test_options_question_keys_follow_option_order_and_are_unique():
     assert not any(isinstance(v, int) for v in ask.state["build"].values())
 
 
+def test_options_question_normalises_dict_shaped_build_items():
+    opts = [{"index": 0, "id": "WHIP", "name": "Whip", "kind": "weapon", "level": 5}]
+    build = {"weapons": [{"id": "WHIP", "level": 4}], "passives": [], "minute": 6}
+    ask = q.options_question("level_up", opts, build)
+    assert ask.state["build"]["weapons"] == ["WHIP L4"]
+
+
 def test_options_question_mentions_evolution_and_new():
     opts = [{"index": 0, "id": "KNIFE", "name": "Knife", "kind": "weapon", "level": 1, "is_new": True,
              "description": "Fires quickly.", "evolution_ready": True}]

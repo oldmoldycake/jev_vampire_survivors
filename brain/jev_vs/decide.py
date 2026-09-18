@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 
 from .digest import Digest, digest_state
@@ -11,6 +12,8 @@ log = logging.getLogger(__name__)
 
 _PRESSURE_RANK = {"none": 0, "light": 1, "moderate": 2, "heavy": 3}
 _GEM_RANK = {"none": 0, "few": 1, "many": 2}
+
+WARN_INTERVAL_S = 60.0  # rate limit for fallback-failure warnings; see Decider._log_failure
 
 
 @dataclass
@@ -57,22 +60,35 @@ class Decider:
     def __init__(self, jev, thresholds: Thresholds):
         self._jev = jev
         self._th = thresholds
+        self._failures_since_warn = 0
+        self._last_warned = 0.0
 
     @property
     def jev(self):
         """The Jev client this decider asks; exposed so the process can close it at shutdown."""
         return self._jev
 
+    def _log_failure(self, msg: str, *args) -> None:
+        """Warn at most once every WARN_INTERVAL_S; every other failure just logs at DEBUG."""
+        self._failures_since_warn += 1
+        now = time.time()
+        if now - self._last_warned >= WARN_INTERVAL_S:
+            log.warning(msg + " (%d failure(s) since last warning)", *args, self._failures_since_warn)
+            self._last_warned = now
+            self._failures_since_warn = 0
+        else:
+            log.debug(msg, *args)
+
     async def _ask(self, ask: Ask) -> tuple[str | None, dict, float, float, int]:
         """Returns (choice or None on failure, probabilities, confidence, latency_ms, tokens)."""
         try:
             result = await self._jev.ask(ask.state, {ask.name: ask.question})
         except Exception as e:  # any SDK/network error becomes a fallback, never a crash
-            log.warning("jev %s failed: %s", ask.name, e)
+            self._log_failure("jev %s failed: %s", ask.name, e)
             return None, {}, 0.0, 0.0, 0
         pick = result.answers.get(ask.name)
         if pick is None or pick.choice not in ask.keys:
-            log.warning("jev %s returned unusable choice %r", ask.name, getattr(pick, "choice", None))
+            self._log_failure("jev %s returned unusable choice %r", ask.name, getattr(pick, "choice", None))
             return None, {}, 0.0, result.latency_ms, result.input_tokens
         return pick.choice, pick.probabilities, pick.confidence, result.latency_ms, result.input_tokens
 

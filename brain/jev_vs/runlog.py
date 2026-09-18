@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import json
 import time
+from collections import deque
 from pathlib import Path
+
+_PENDING_MAXLEN = 64
 
 
 class RunLog:
@@ -15,7 +18,7 @@ class RunLog:
         self._events = None
         self._tick_count = 0
         self._event_count = 0
-        self._pending: list[tuple[str, dict]] = []
+        self._pending: deque[tuple[str, dict]] = deque(maxlen=_PENDING_MAXLEN)
 
     @property
     def run_dir(self) -> Path | None:
@@ -51,14 +54,16 @@ class RunLog:
 
     def tick(self, record: dict) -> None:
         if not self.active:
-            self._pending.append(("tick", record))
+            # Stamp arrival time now so a later flush (in start_run) doesn't
+            # relabel this record with the flush time instead.
+            self._pending.append(("tick", {"t": time.time(), **record}))
             return
         self._tick_count += 1
         self._write(self._ticks, record)
 
     def event(self, record: dict) -> None:
         if not self.active:
-            self._pending.append(("event", record))
+            self._pending.append(("event", {"t": time.time(), **record}))
             return
         self._event_count += 1
         self._write(self._events, record)
@@ -68,6 +73,7 @@ class RunLog:
 
     def end_run(self, summary: dict) -> dict:
         if not self.active:
+            self._pending.clear()
             return {}
         written = {**self._meta, **summary, "ended_at": time.time(),
                    "ticks": self._tick_count, "events": self._event_count}

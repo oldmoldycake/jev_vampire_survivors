@@ -155,6 +155,7 @@
       const m = JSON.parse(ev.data);
       if (m.type === "snapshot") {
         renderStats(m.stats); Object.values(m.decisions || {}).forEach(renderDecision);
+        $("log").replaceChildren(); document.querySelector("#runs tbody").replaceChildren();
         (m.log || []).slice().reverse().forEach(addLog); $("s-run").textContent = (m.run && m.run.character) || "-";
         (m.runs || []).forEach(addRun);
       } else if (m.type === "stats") renderStats(m);

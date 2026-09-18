@@ -14,6 +14,17 @@ log = logging.getLogger(__name__)
 STATIC = Path(__file__).parent / "static"
 
 
+def _allowed_origins(request: web.Request) -> set[str]:
+    """Origins a browser WebSocket upgrade may come from: this dashboard's own host, by name or address."""
+    host = request.host  # e.g. "127.0.0.1:48232"; already "host:port" per the Host header
+    allowed = {f"http://{host}"}
+    port = host.rsplit(":", 1)[-1] if ":" in host else None
+    if port:
+        allowed.add(f"http://127.0.0.1:{port}")
+        allowed.add(f"http://localhost:{port}")
+    return allowed
+
+
 def make_app(server: PluginServer) -> web.Application:
     app = web.Application()
 
@@ -21,6 +32,10 @@ def make_app(server: PluginServer) -> web.Application:
         return web.Response(text=(STATIC / "index.html").read_text(encoding="utf-8"), content_type="text/html")
 
     async def ws_handler(request: web.Request) -> web.WebSocketResponse:
+        origin = request.headers.get("Origin")
+        if origin and origin not in _allowed_origins(request):
+            log.warning("rejected websocket upgrade from origin %r", origin)
+            raise web.HTTPForbidden()
         ws = web.WebSocketResponse(heartbeat=20)
         await ws.prepare(request)
         q = server.hub.subscribe()

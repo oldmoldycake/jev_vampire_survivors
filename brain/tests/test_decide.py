@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from jev_vs import decide
@@ -78,3 +80,26 @@ async def test_jev_client_constructs_without_api_key(monkeypatch):
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     client = JevClient(model="jev-latest", timeout_s=0.5, max_retries=0)   # must not raise
     await client.aclose()                                                   # must not raise
+
+
+async def test_real_jev_client_falls_back_end_to_end_without_api_key(monkeypatch):
+    # Offline-safe: AsyncTypeSafeClient raises for a missing API key during construction,
+    # before any network call is made, so Decider.direction still falls back cleanly.
+    from jev_vs.jev_client import JevClient
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    dec = decide.Decider(JevClient(model="jev-latest", timeout_s=0.5, max_retries=0), TH)
+    _, d = await dec.direction(make_state())
+    assert d.source == "fallback"
+    await dec.jev.aclose()
+
+
+async def test_fallback_warnings_are_rate_limited(caplog):
+    caplog.set_level(logging.DEBUG, logger="jev_vs.decide")
+    fake = FakeJev(fail=True)
+    dec = decide.Decider(fake, TH)
+    for _ in range(5):
+        await dec.direction(make_state())
+    warnings = [r for r in caplog.records if r.name == "jev_vs.decide" and r.levelno == logging.WARNING]
+    debugs = [r for r in caplog.records if r.name == "jev_vs.decide" and r.levelno == logging.DEBUG]
+    assert len(warnings) == 1
+    assert len(debugs) == 4

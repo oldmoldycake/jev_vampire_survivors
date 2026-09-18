@@ -170,9 +170,15 @@ class PluginServer:
             await self._reply(writer, protocol.noop_reply(mid))
             summary = msg.get("summary", {})
             self.runlog.event({"id": mid, "event": event, "summary": summary})
-            written = self.runlog.end_run(summary)
-            self.run_history.append({**written, **self.stats.snapshot()})
-            del self.run_history[:-50]
+            snap = self.stats.snapshot()  # spec section 9 run stats, taken before the run log closes
+            written = self.runlog.end_run({
+                **summary,
+                "jev_calls": snap["jev_calls"], "fallback_calls": snap["fallback_calls"], "reused": snap["reused"],
+                "avg_latency_ms": snap["avg_latency_ms"], "input_tokens": snap["input_tokens"], "cost_usd": snap["cost_usd"],
+            })
+            if written:  # a game_over with no active run must not add a row
+                self.run_history.append(written)
+                del self.run_history[:-50]
             self._note(f"game over: {summary.get('character')} on {summary.get('stage')} survived {summary.get('seconds')}s level {summary.get('level')}")
             self.hub.publish({"type": "run", "phase": "end", "summary": written})
             self.current_run = {}
@@ -194,9 +200,10 @@ class PluginServer:
             self.current_run = {"started_at": time.time()}
             self.hub.publish({"type": "run", "phase": "start", "meta": self.current_run})
         decision = await self.decider.pick(kind, options, msg.get("build"))
-        await self._reply(writer, protocol.pick_reply(mid, decision.index, decision.choice, decision.probabilities,
-                                                      decision.confidence, decision.source))
         chosen = options[decision.index]
+        reply_index = chosen.get("index", decision.index)
+        await self._reply(writer, protocol.pick_reply(mid, reply_index, decision.choice, decision.probabilities,
+                                                      decision.confidence, decision.source))
         if event == "character_select":
             self.current_run["character"] = chosen.get("id")
             self.runlog.update_meta(character=chosen.get("id"))

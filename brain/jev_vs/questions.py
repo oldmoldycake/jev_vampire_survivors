@@ -163,6 +163,13 @@ def _option_description(kind: str, o: dict) -> str:
     return "; ".join(bits)
 
 
+def _build_item_text(item) -> str:
+    """A build entry as words: dict-shaped items (the wire format) show id and level; anything else is str()'d."""
+    if isinstance(item, dict):
+        return f"{item.get('id', '?')} L{item.get('level', '?')}"
+    return str(item)
+
+
 def options_question(kind: str, options: list[dict], build: dict | None) -> Ask:
     if kind not in _PICK_INSTRUCTIONS:
         raise ValueError(f"unknown pick kind {kind!r}")
@@ -178,8 +185,8 @@ def options_question(kind: str, options: list[dict], build: dict | None) -> Ask:
     state: dict = {"decision": kind.replace("_", " ")}
     if build:
         state["build"] = {
-            "weapons": list(build.get("weapons", [])),
-            "passives": list(build.get("passives", [])),
+            "weapons": [_build_item_text(w) for w in build.get("weapons", [])],
+            "passives": [_build_item_text(p) for p in build.get("passives", [])],
             "run_phase": _minute_words(int(build.get("minute", 0))),
         }
     instructions = _PICK_INSTRUCTIONS[kind]

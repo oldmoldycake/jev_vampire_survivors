@@ -120,7 +120,7 @@ Enemies, gems, and pickups are those the game reports in screen bounds, sorted b
 {"type": "control", "automation": false}
 ```
 
-`source` is `jev` or `fallback` so logs show which decisions came from the model. `control` has no id and is sent when the dashboard's pause or resume button is pressed; the plugin treats it exactly like the F9 hotkey.
+`source` is `jev`, `fallback`, or `reused` (the last decision replayed for a tick that arrived while a Jev request was in flight) so logs show which decisions came from the model. `control` has no id and is sent when the dashboard's pause or resume button is pressed; the plugin treats it exactly like the F9 hotkey.
 
 ## 5. Brain
 
@@ -199,13 +199,13 @@ The brain writes `runs/<YYYYMMDD-HHMMSS>/`:
 - `events.jsonl`: every menu event and its answer, same fields.
 - `summary.json`: character, stage, seconds survived, level, kills, counts of jev versus fallback decisions, mean latency.
 
-The brain reads `brain/config.toml` (plugin port, dashboard port, tick_hz, model, request timeout, retry policy, digest thresholds, log directory). The plugin reads its BepInEx config file.
+The brain reads `brain/config.toml` (plugin port, dashboard port, tick_hz, model, request timeout, retry policy, log directory); digest thresholds live in `brain/jev_vs/questions.py`. The plugin reads its BepInEx config file.
 
 ## 10. Dashboard
 
 Modelled on TypeSafe's Doom demo: a dark "ops" page beside the game window, refreshed live, never polled.
 
-**Serving.** The brain runs an `aiohttp` app on `127.0.0.1:48232` (configurable). `GET /` returns one static HTML file with inline CSS and JavaScript, no build step. `GET /ws` upgrades to a WebSocket. Each browser client receives a `snapshot` message on connect (current run, latest decision per question, stats) and then a stream of `decision`, `tick`, `event`, `stats`, and `run` messages. The brain publishes to an in-process broadcast after every Jev answer, every fallback, every menu event, and every run start or end; tick digests are broadcast at most at `tick_hz`. A slow client is dropped rather than allowed to back up the brain.
+**Serving.** The brain runs an `aiohttp` app on `127.0.0.1:48232` (configurable). `GET /` returns one static HTML file with inline CSS and JavaScript, no build step. `GET /ws` upgrades to a WebSocket. Each browser client receives a `snapshot` message on connect (current run, latest decision per question, stats) and then a stream of `decision`, `tick`, `event`, `stats`, and `run` messages. The brain publishes to an in-process broadcast after every Jev answer, every fallback, every menu event, and every run start or end; tick digests are broadcast at most at `tick_hz`. A slow client is dropped rather than allowed to back up the brain. The brain folds tick digests into the `direction` decision message (which carries the digest and raw entities), so no separate `tick` message is sent.
 
 **Panels.**
 

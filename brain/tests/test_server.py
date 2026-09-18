@@ -115,12 +115,37 @@ async def test_events_drive_run_log_and_picks(tmp_path):
     assert (await _recv(reader)) == {"id": 13, "type": "noop"}
     assert srv.runlog.active is False
     assert srv.run_history[-1]["character"] == "IMELDA" and srv.run_history[-1]["seconds"] == 90
+    assert srv.run_history[-1]["jev_calls"] == 3
     run_dirs = [p for p in Path(tmp_path).iterdir() if p.is_dir()]
     assert len(run_dirs) == 1
     summary = json.loads((run_dirs[0] / "summary.json").read_text())
     assert summary["character"] == "IMELDA" and summary["stage"] == "FOREST" and summary["seconds"] == 90
+    assert summary["jev_calls"] == 3 and summary["fallback_calls"] == 0
     events = (run_dirs[0] / "events.jsonl").read_text().splitlines()
     assert len(events) == 4
+    writer.close()
+    await srv.stop()
+
+
+async def test_game_over_with_no_active_run_does_not_add_history_row(tmp_path):
+    srv, hub, stats, reader, writer = await _start(tmp_path, FakeJev())
+    before = len(srv.run_history)
+    await _send(writer, {"id": 1, "type": "event", "event": "game_over",
+                         "summary": {"character": "NOBODY", "stage": "NONE", "seconds": 0, "level": 1}})
+    assert (await _recv(reader)) == {"id": 1, "type": "noop"}
+    assert len(srv.run_history) == before
+    writer.close()
+    await srv.stop()
+
+
+async def test_pick_reply_echoes_options_own_index(tmp_path):
+    jev = FakeJev(script={"character": ("B", {"A": 0.0, "B": 1.0}, 1.0)})
+    srv, hub, stats, reader, writer = await _start(tmp_path, jev)
+    opts = [{"id": "A", "name": "A", "index": 7, "description": "d"},
+            {"id": "B", "name": "B", "index": 9, "description": "d"}]
+    await _send(writer, {"id": 1, "type": "event", "event": "character_select", "options": opts})
+    reply = await _recv(reader)
+    assert reply["index"] == 9 and reply["choice"] == "B"
     writer.close()
     await srv.stop()
 
