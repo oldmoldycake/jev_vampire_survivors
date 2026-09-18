@@ -6,7 +6,7 @@ import random
 import time
 from dataclasses import dataclass, field
 
-from .digest import Digest, digest_state
+from .digest import BlockMemory, Digest, digest_state
 from .questions import DIRECTIONS, VARIETY_KINDS, Ask, Thresholds, direction_question, options_question
 
 log = logging.getLogger(__name__)
@@ -72,6 +72,7 @@ class Decider:
         self._jev = jev
         self._th = thresholds
         self._rng = rng if rng is not None else random.Random()
+        self._block_memory = BlockMemory(thresholds)
         self._failures_since_warn = 0
         self._last_warned = 0.0
 
@@ -79,6 +80,10 @@ class Decider:
     def jev(self):
         """The Jev client this decider asks; exposed so the process can close it at shutdown."""
         return self._jev
+
+    def reset_run(self) -> None:
+        """Forget remembered blocks and the stuck trail; call at the start of a new run."""
+        self._block_memory.clear()
 
     def _log_failure(self, msg: str, *args) -> None:
         """Warn at most once every WARN_INTERVAL_S; every other failure just logs at DEBUG."""
@@ -105,7 +110,7 @@ class Decider:
         return pick.choice, pick.probabilities, pick.confidence, result.latency_ms, result.input_tokens
 
     async def direction(self, state: dict) -> tuple[Digest, Decision]:
-        d = digest_state(state, self._th)
+        d = digest_state(state, self._th, memory=self._block_memory)
         ask = direction_question(d)
         choice, probs, conf, latency, tokens = await self._ask(ask)
         source = "jev"

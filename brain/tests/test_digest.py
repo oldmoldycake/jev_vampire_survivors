@@ -177,3 +177,102 @@ def test_not_blocked_when_moved_is_absent():
     st["player"]["applied_direction"] = "north"   # valid compass direction, but no "moved" field at all
     d = digest.digest_state(st, TH)
     assert all(not s.blocked for s in d.sectors.values())
+
+
+# ----------------------------------------------------------------- block memory
+
+def test_block_memory_reports_blocked_before_expiry_and_not_after():
+    mem = digest.BlockMemory(TH)
+    mem.record("north", 10.0)
+    assert "north" in mem.blocked(10.0 + TH.block_memory_s - 0.1)
+    assert "north" not in mem.blocked(10.0 + TH.block_memory_s + 0.1)
+
+
+def test_block_memory_repeat_refreshes_the_timer():
+    mem = digest.BlockMemory(TH)
+    mem.record("north", 10.0)
+    mem.record("north", 10.0 + TH.block_memory_s - 0.1)   # refresh just before it would have expired
+    # more than block_memory_s after the *first* record, but well within it of the refresh
+    assert "north" in mem.blocked(10.0 + TH.block_memory_s + 0.5)
+
+
+def test_block_memory_clear_empties_it():
+    mem = digest.BlockMemory(TH)
+    mem.record("north", 10.0)
+    mem.note_position(10.0, 0.0, 0.0, "north")
+    mem.clear()
+    assert mem.blocked(10.0) == set()
+    assert mem.is_stuck(4.0, TH) is False
+
+
+def test_digest_state_with_memory_marks_remembered_direction_blocked_on_a_later_tick():
+    mem = digest.BlockMemory(TH)
+    st1 = make_state()
+    st1["player"]["applied_direction"] = "north"
+    st1["player"]["moved"] = 0.0
+    st1["player"]["seconds"] = 10.0
+    digest.digest_state(st1, TH, memory=mem)
+
+    st2 = make_state()
+    st2["player"]["applied_direction"] = "east"   # a different direction is applied this tick
+    st2["player"]["moved"] = 1.0                  # east itself moved fine, not newly blocked
+    st2["player"]["seconds"] = 11.0                # still within block_memory_s of the first block
+    d2 = digest.digest_state(st2, TH, memory=mem)
+    assert d2.sectors["north"].blocked is True     # remembered from the earlier tick
+    assert d2.sectors["east"].blocked is False
+
+
+def test_digest_state_without_memory_behaves_exactly_as_before():
+    st = make_state()
+    st["player"]["applied_direction"] = "north"
+    st["player"]["moved"] = 0.01
+    d = digest.digest_state(st, TH)   # no memory passed at all
+    assert d.sectors["north"].blocked is True
+    assert d.player.stuck is False
+
+
+def test_digest_state_sets_player_stuck_from_memory():
+    mem = digest.BlockMemory(TH)
+    d = None
+    for i in range(3):
+        st = make_state()
+        st["player"]["seconds"] = float(i) * (TH.stuck_window_s / 2)
+        st["player"]["x"] = 0.001 * i
+        st["player"]["y"] = 0.0
+        st["player"]["applied_direction"] = "north"
+        st["player"]["moved"] = 1.0
+        d = digest.digest_state(st, TH, memory=mem)
+    assert d.player.stuck is True
+
+
+# ----------------------------------------------------------------- stuck detection
+
+def test_is_stuck_true_for_barely_moving_trail_with_a_real_direction_applied():
+    mem = digest.BlockMemory(TH)
+    mem.note_position(0.0, 0.0, 0.0, "north")
+    mem.note_position(1.0, 0.01, 0.0, "north")
+    mem.note_position(TH.stuck_window_s, 0.02, 0.0, "north")
+    assert mem.is_stuck(4.0, TH) is True
+
+
+def test_is_stuck_false_when_every_sample_applied_stay():
+    mem = digest.BlockMemory(TH)
+    mem.note_position(0.0, 0.0, 0.0, "stay")
+    mem.note_position(1.0, 0.0, 0.0, "stay")
+    mem.note_position(TH.stuck_window_s, 0.0, 0.0, "stay")
+    assert mem.is_stuck(4.0, TH) is False
+
+
+def test_is_stuck_false_when_survivor_actually_moved():
+    mem = digest.BlockMemory(TH)
+    mem.note_position(0.0, 0.0, 0.0, "north")
+    mem.note_position(1.0, 1.0, 0.0, "north")
+    mem.note_position(TH.stuck_window_s, 2.0, 0.0, "north")   # well past stuck_move_frac * half_h
+    assert mem.is_stuck(4.0, TH) is False
+
+
+def test_is_stuck_false_when_trail_is_shorter_than_the_window():
+    mem = digest.BlockMemory(TH)
+    mem.note_position(0.0, 0.0, 0.0, "north")
+    mem.note_position(TH.stuck_window_s - 0.5, 0.0, 0.0, "north")
+    assert mem.is_stuck(4.0, TH) is False

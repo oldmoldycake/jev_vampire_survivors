@@ -2,7 +2,7 @@ import pytest
 from typesafe_sdk import Choice
 
 from jev_vs import questions as q
-from jev_vs.digest import SectorSummary, digest_state
+from jev_vs.digest import Digest, PlayerSummary, SectorSummary, digest_state
 from tests.conftest import enemy, gem, make_state
 
 
@@ -40,7 +40,7 @@ def test_sector_text_mentions_every_object_category():
 def test_sector_text_leads_with_blocked():
     s = SectorSummary(blocked=True)
     text = q.sector_text(s)
-    assert text.startswith("blocked, you are not moving that way")
+    assert text.startswith("blocked, the survivor cannot get through that way")
 
 
 @pytest.mark.parametrize("kind,expected", [
@@ -83,6 +83,24 @@ def test_direction_question_carries_level_progress_and_instructions_mention_bloc
     assert "level_progress" in ask.state["player"]
     assert ask.state["player"]["level_progress"]
     assert "blocked" in ask.instructions.lower()
+
+
+def test_direction_question_omits_movement_key_when_not_stuck():
+    st = make_state()
+    ask = q.direction_question(digest_state(st, q.DEFAULT_THRESHOLDS))
+    assert "movement" not in ask.state["player"]
+
+
+def test_direction_question_carries_movement_key_when_stuck():
+    player = PlayerSummary(hp_bucket="ok", hp=80.0, max_hp=100.0, level=1, minute=1, stuck=True)
+    sectors = {name: SectorSummary() for name in q.DIRECTIONS[:-1]}
+    d = Digest(player=player, sectors=sectors)
+    ask = q.direction_question(d)
+    assert ask.state["player"]["movement"] == "you are shuffling in place and not getting anywhere"
+
+
+def test_direction_instructions_mention_shuffling():
+    assert "shuffling" in q.DIRECTION_INSTRUCTIONS.lower()
 
 
 def test_options_question_keys_follow_option_order_and_are_unique():

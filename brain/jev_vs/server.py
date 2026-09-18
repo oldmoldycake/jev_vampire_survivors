@@ -210,6 +210,7 @@ class PluginServer:
             return
         if event == "character_select":
             self.stats.reset_run()
+            self.decider.reset_run()
             self.runlog.start_run({})
             self.current_run = {"started_at": time.time()}
             self.hub.publish({"type": "run", "phase": "start", "meta": self.current_run})

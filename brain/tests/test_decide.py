@@ -167,6 +167,24 @@ async def test_pick_level_up_always_returns_jevs_top_answer():
         assert decision.sampled is False
 
 
+async def test_reset_run_clears_block_memory():
+    fake = FakeJev(script={"direction": ("east", {"east": 1.0}, 0.9)})
+    dec = decide.Decider(fake, TH)
+    st = make_state()
+    st["player"]["applied_direction"] = "north"
+    st["player"]["moved"] = 0.0
+    d, _ = await dec.direction(st)
+    assert d.sectors["north"].blocked is True   # remembered
+
+    dec.reset_run()
+
+    st2 = make_state()
+    st2["player"]["applied_direction"] = "east"
+    st2["player"]["moved"] = 1.0
+    d2, _ = await dec.direction(st2)
+    assert d2.sectors["north"].blocked is False   # reset_run cleared the memory
+
+
 async def test_fallback_warnings_are_rate_limited(caplog):
     caplog.set_level(logging.DEBUG, logger="jev_vs.decide")
     fake = FakeJev(fail=True)

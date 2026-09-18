@@ -37,6 +37,9 @@ class Thresholds:
     xp_close: float = 0.6
     xp_imminent: float = 0.9
     blocked_move: float = 0.05
+    block_memory_s: float = 3.0
+    stuck_window_s: float = 2.0
+    stuck_move_frac: float = 0.1
 
 
 DEFAULT_THRESHOLDS = Thresholds()
@@ -58,6 +61,8 @@ DIRECTION_INSTRUCTIONS = (
     "You steer the survivor in a top-down arena. Each option is a direction to walk for the next "
     "quarter second, described by what lies that way. "
     "Never choose a direction described as blocked: the survivor cannot move that way at all. "
+    "If the state says you are shuffling in place, commit to a single direction that is not blocked "
+    "and keep choosing it until the survivor is clear. "
     "Never walk into heavy or touching enemy pressure. "
     "When hp is critical, choose the safest direction and ignore everything else. "
     "When hp is low, go for healing if a direction has it and its pressure is none or light, "
@@ -109,7 +114,7 @@ def sector_text(s: SectorSummary) -> str:
     """Words only. Never a digit."""
     parts: list[str] = []
     if s.blocked:
-        parts.append("blocked, you are not moving that way")
+        parts.append("blocked, the survivor cannot get through that way")
     if s.enemy_count == 0 and s.gem_count == 0 and not s.objects and not s.boss:
         parts.append("no enemies, no gems")
         return ", ".join(parts)
@@ -139,14 +144,17 @@ class Ask:
 def direction_question(d: Digest) -> Ask:
     criteria = {name: sector_text(d.sectors[name]) for name in DIRECTIONS if name != "stay"}
     criteria["stay"] = "stand still where the player is now"
+    player_state = {
+        "hp": d.player.hp_bucket,
+        "level_progress": d.player.xp_bucket,
+        "minute_of_run": _minute_words(d.player.minute),
+        "weapons": d.player.weapons,
+        "passives": d.player.passives,
+    }
+    if d.player.stuck:
+        player_state["movement"] = "you are shuffling in place and not getting anywhere"
     state = {
-        "player": {
-            "hp": d.player.hp_bucket,
-            "level_progress": d.player.xp_bucket,
-            "minute_of_run": _minute_words(d.player.minute),
-            "weapons": d.player.weapons,
-            "passives": d.player.passives,
-        },
+        "player": player_state,
         "surroundings": {name: criteria[name] for name in DIRECTIONS if name != "stay"},
     }
     return Ask(
