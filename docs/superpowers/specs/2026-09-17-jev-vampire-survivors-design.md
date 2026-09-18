@@ -91,11 +91,16 @@ One JSON object per line, UTF-8. Every plugin message that expects an answer car
 
 {"id": 21, "type": "event", "event": "arcana_select", "options": [{"index": 0, "id": "XV", "name": "Disco of Gold", "description": "..."}]}
 
+{"id": 23, "type": "event", "event": "weapon_select",
+ "options": [{"index": 0, "id": "WHIP", "name": "Whip", "kind": "weapon", "level": 1, "is_new": true, "description": "..."}]}
+
 {"id": 22, "type": "event", "event": "game_over",
  "summary": {"character": "ANTONIO", "stage": "FOREST", "seconds": 1043, "level": 27, "kills": 1834, "stage_complete": false}}
 ```
 
-Enemies, gems, and pickups are those the game reports in screen bounds, sorted by distance to the player, capped at `max_entities` (default 200 each). Positions are Unity world units relative to the player. `screen` gives the half extents of the visible area so the brain can bucket distances relative to what is on screen.
+Enemies, gems, and pickups are those the game reports in screen bounds, sorted by distance to the player, capped at `max_entities` (default 200 each). Positions are Unity world units relative to the player, and `screen` gives the half extents of the visible area in the same units so the brain can bucket distances relative to what is on screen. `t` is seconds since the run started.
+
+`level_up` and `weapon_select` options share one shape. The plugin sets `evolution_ready: true` on a weapon option when `LevelUpFactory.HasEvolutionRequirements` reports its evolution requirements are met; the brain only phrases that flag, it never computes it.
 
 ### Brain to plugin
 
@@ -126,7 +131,7 @@ The exact bucket thresholds are constants in `brain/jev_vs/questions.py` next to
 ### Questions (all in `brain/jev_vs/questions.py`)
 
 - **direction** (per tick): `Choice` with nine options, `north` ... `north_west` plus `stay`. Each option's description is that sector's summary in words, for example "heavy enemy pressure, nearest touching, no gems". State is a JSON object with the player summary. Instructions tell Jev to move away from heavy pressure and toward gems, to prefer safety when HP is low or critical, and to prefer gems when HP is ok or full.
-- **level_up** (per level-up or arcana prompt): `Choice` over the offered options, description carrying name, kind, level it would reach, whether it is new, whether it completes an evolution pair, and the in-game text. State is the current build. Instructions ask for the option that most strengthens the current build.
+- **level_up** (per level-up, weapon-select, or arcana prompt): `Choice` over the offered options, description carrying name, kind, level it would reach, whether it is new, whether `evolution_ready` is set, and the in-game text. State is the current build. Instructions ask for the option that most strengthens the current build.
 - **character** (per run): `Choice` over unlocked characters with in-game descriptions.
 - **stage** (per run): `Choice` over unlocked stages with in-game descriptions.
 
@@ -160,7 +165,7 @@ Responsibilities:
 
 1. Game boots. Landing and save-slot pages are confirmed.
 2. Main menu shows. Plugin calls `ShowCharacterSelect`.
-3. Character select shows. Plugin sends the unlocked list, applies the pick, confirms. If a weapon selection page appears, the plugin sends it as a `level_up` style event.
+3. Character select shows. Plugin sends the unlocked list, applies the pick, confirms. If a weapon selection page appears, the plugin sends a `weapon_select` event, which the brain answers with the level-up question.
 4. Stage select shows. Plugin sends available stages, applies the pick, confirms with default modifiers (no hyper, hurry, inverse, or endless).
 5. Run starts. Ticks flow; movement follows Jev. Level-up and arcana pages are answered. Treasure and unlock pages are dismissed.
 6. Game over shows. Plugin sends the summary, quits to the recap, confirms, and returns to the main menu.
