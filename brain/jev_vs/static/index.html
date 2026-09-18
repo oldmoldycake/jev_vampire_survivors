@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jev Survivors Ops</title>
+<style>
+  :root { --bg:#050806; --panel:#0b120d; --line:#1d3a25; --ink:#b8f0c3; --dim:#5f8a68; --hot:#39ff7a; --warn:#ffb347; --bad:#ff5c5c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { display:flex; flex-wrap:wrap; gap:14px; align-items:center; padding:8px 14px; border-bottom:1px solid var(--line); background:var(--panel); position:sticky; top:0; }
+  header b { color:var(--hot); }
+  .stat { color:var(--dim); } .stat span { color:var(--ink); }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--bad); margin-right:4px; }
+  .dot.on { background:var(--hot); }
+  button { background:transparent; color:var(--hot); border:1px solid var(--hot); padding:3px 10px; font:inherit; cursor:pointer; }
+  button.paused { color:var(--warn); border-color:var(--warn); }
+  main { display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding:12px 14px; }
+  @media (max-width:900px) { main { grid-template-columns:1fr; } }
+  section { background:var(--panel); border:1px solid var(--line); padding:10px; }
+  h2 { margin:0 0 8px; font-size:11px; letter-spacing:.14em; color:var(--dim); text-transform:uppercase; }
+  .card { border:1px solid var(--line); padding:8px; margin-bottom:8px; }
+  .card .q { color:var(--dim); margin-bottom:6px; white-space:pre-wrap; }
+  .tag { display:inline-block; border:1px solid var(--hot); color:var(--hot); padding:0 5px; margin-right:6px; font-size:10px; }
+  .row { display:grid; grid-template-columns: 120px 1fr 48px; gap:6px; align-items:center; margin:2px 0; color:var(--dim); }
+  .row.win { color:var(--hot); }
+  .bar { height:8px; background:#122117; border:1px solid var(--line); }
+  .bar i { display:block; height:100%; background:var(--dim); }
+  .row.win .bar i { background:var(--hot); }
+  .meta { color:var(--dim); margin-top:4px; }
+  canvas { width:100%; aspect-ratio:1; background:#070c09; border:1px solid var(--line); display:block; }
+  #status { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
+  #log { max-height:220px; overflow:auto; }
+  #log div { border-bottom:1px dashed var(--line); padding:2px 0; }
+  #runs td, #runs th { padding:2px 6px; text-align:left; color:var(--dim); } #runs th { color:var(--ink); }
+  .src-fallback { color:var(--warn); } .src-reused { color:var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <b>JEV // SURVIVORS OPS</b>
+  <span class="stat"><i class="dot" id="dot-plugin"></i>plugin</span>
+  <span class="stat"><i class="dot" id="dot-jev"></i>jev</span>
+  <span class="stat">run <span id="s-run">-</span></span>
+  <span class="stat">calls <span id="s-calls">0</span></span>
+  <span class="stat">last <span id="s-last">0</span>ms</span>
+  <span class="stat">avg <span id="s-avg">0</span>ms</span>
+  <span class="stat">cost $<span id="s-cost">0</span> (<span id="s-rate">0</span>/h)</span>
+  <span class="stat">jev/fallback/reused <span id="s-mix">0/0/0</span></span>
+  <button id="pause">PAUSE</button>
+</header>
+<main>
+  <section>
+    <h2>Judgments</h2>
+    <div id="cards"></div>
+  </section>
+  <section>
+    <h2>Radar</h2>
+    <div id="status"></div>
+    <canvas id="radar" width="480" height="480"></canvas>
+    <h2 style="margin-top:12px">Log</h2>
+    <div id="log"></div>
+    <h2 style="margin-top:12px">Runs this session</h2>
+    <table id="runs"><thead><tr><th>character</th><th>stage</th><th>seconds</th><th>level</th><th>jev</th><th>fallback</th></tr></thead><tbody></tbody></table>
+  </section>
+</main>
+<script>
+(() => {
+  const KINDS = ["direction", "level_up", "weapon_select", "arcana_select", "character", "stage"];
+  const SECTORS = ["north","north_east","east","south_east","south","south_west","west","north_west"];
+  const PRESSURE_ALPHA = { none: 0.0, light: 0.15, moderate: 0.35, heavy: 0.6 };
+  let automation = true;
+  const $ = (id) => document.getElementById(id);
+
+  function renderStats(s) {
+    $("dot-plugin").classList.toggle("on", !!s.plugin_connected);
+    $("dot-jev").classList.toggle("on", !!s.jev_ok);
+    $("s-calls").textContent = s.calls; $("s-last").textContent = s.last_latency_ms; $("s-avg").textContent = s.avg_latency_ms;
+    $("s-cost").textContent = (s.cost_usd || 0).toFixed(4); $("s-rate").textContent = (s.cost_per_hour_usd || 0).toFixed(2);
+    $("s-mix").textContent = `${s.jev_calls}/${s.fallback_calls}/${s.reused}`;
+  }
+
+  function card(kind) {
+    let el = document.querySelector(`.card[data-kind="${kind}"]`);
+    if (!el) { el = document.createElement("div"); el.className = "card"; el.dataset.kind = kind; $("cards").appendChild(el); }
+    return el;
+  }
+
+  function renderDecision(d) {
+    const el = card(d.kind);
+    const keys = Object.keys(d.probabilities || {});
+    keys.sort((a, b) => (d.probabilities[b] - d.probabilities[a]));
+    const rows = keys.map(k => {
+      const p = d.probabilities[k] || 0;
+      const label = (d.labels && d.labels[k]) || k;
+      return `<div class="row ${k === d.choice ? "win" : ""}"><span title="${label}">${label.slice(0, 18)}</span><div class="bar"><i style="width:${(p * 100).toFixed(1)}%"></i></div><span>${p.toFixed(2)}</span></div>`;
+    }).join("");
+    el.innerHTML = `<span class="tag">${d.kind.toUpperCase()}</span><span class="q">${(d.instructions || "").slice(0, 220)}</span>${rows}
+      <div class="meta">conf ${(d.confidence || 0).toFixed(2)} · ${d.latency_ms || 0}ms · <span class="src-${d.source}">${d.source}</span></div>`;
+    if (d.kind === "direction") renderRadar(d);
+  }
+
+  function renderStatus(p) {
+    if (!p) return;
+    $("status").innerHTML = [`hp ${p.hp_bucket} (${Math.round(p.hp)}/${Math.round(p.max_hp)})`, `level ${p.level}`, `minute ${p.minute}`,
+      `weapons: ${(p.weapons || []).join(", ") || "-"}`, `passives: ${(p.passives || []).join(", ") || "-"}`].map(t => `<span>${t}</span>`).join("");
+  }
+
+  function renderRadar(d) {
+    const cv = $("radar"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, cx = W / 2, cy = H / 2, R = W / 2 - 6;
+    ctx.clearRect(0, 0, W, H);
+    const sectors = (d.digest && d.digest.sectors) || {};
+    renderStatus(d.digest && d.digest.player);
+    SECTORS.forEach((name, i) => {
+      const a0 = (i * 45 - 22.5 - 90) * Math.PI / 180, a1 = a0 + Math.PI / 4;
+      const s = sectors[name] || {};
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0, a1); ctx.closePath();
+      ctx.fillStyle = `rgba(255,92,92,${PRESSURE_ALPHA[s.pressure] || 0})`; ctx.fill();
+      ctx.strokeStyle = "#1d3a25"; ctx.stroke();
+      if (s.gems && s.gems !== "none") { ctx.fillStyle = "rgba(57,255,122,0.12)"; ctx.fill(); }
+    });
+    const ent = d.entities || {}, half = (ent.screen && ent.screen.half_h) || 1;
+    const scale = R / (half * 1.6);
+    const dot = (list, color, r) => (list || []).forEach(e => {
+      ctx.beginPath(); ctx.arc(cx + e.x * scale, cy - e.y * scale, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+    });
+    dot(ent.gems, "#39ff7a", 2); dot(ent.pickups, "#ffb347", 4);
+    dot((ent.enemies || []).filter(e => !e.boss), "#ff5c5c", 3); dot((ent.enemies || []).filter(e => e.boss), "#ff2b2b", 7);
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fillStyle = "#b8f0c3"; ctx.fill();
+    if (d.choice && d.choice !== "stay") {
+      const idx = SECTORS.indexOf(d.choice), ang = (idx * 45 - 90) * Math.PI / 180;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ang) * R * 0.5, cy + Math.sin(ang) * R * 0.5);
+      ctx.strokeStyle = "#39ff7a"; ctx.lineWidth = 3; ctx.stroke(); ctx.lineWidth = 1;
+    }
+  }
+
+  function addLog(e) {
+    const div = document.createElement("div");
+    div.textContent = `${new Date((e.t || Date.now() / 1000) * 1000).toLocaleTimeString()}  ${e.text}`;
+    $("log").prepend(div);
+    while ($("log").childElementCount > 50) $("log").lastElementChild.remove();
+  }
+
+  function addRun(summary) {
+    if (!summary) return;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${summary.character || "-"}</td><td>${summary.stage || "-"}</td><td>${summary.seconds || 0}</td><td>${summary.level || 0}</td><td>${summary.jev_calls ?? "-"}</td><td>${summary.fallback_calls ?? "-"}</td>`;
+    document.querySelector("#runs tbody").prepend(tr);
+  }
+
+  let ws;
+  function connect() {
+    ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+    ws.onmessage = (ev) => {
+      const m = JSON.parse(ev.data);
+      if (m.type === "snapshot") {
+        renderStats(m.stats); Object.values(m.decisions || {}).forEach(renderDecision);
+        (m.log || []).slice().reverse().forEach(addLog); $("s-run").textContent = (m.run && m.run.character) || "-";
+      } else if (m.type === "stats") renderStats(m);
+      else if (m.type === "decision") renderDecision(m);
+      else if (m.type === "event") addLog(m);
+      else if (m.type === "run") { if (m.phase === "end") addRun(m.summary); $("s-run").textContent = m.phase === "start" ? "starting" : "-"; }
+    };
+    ws.onclose = () => setTimeout(connect, 1000);
+  }
+  $("pause").onclick = () => {
+    automation = !automation;
+    $("pause").textContent = automation ? "PAUSE" : "RESUME"; $("pause").classList.toggle("paused", !automation);
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "control", automation }));
+  };
+  KINDS.forEach(card);
+  connect();
+})();
+</script>
+</body>
+</html>
