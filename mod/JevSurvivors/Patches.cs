@@ -21,6 +21,7 @@ namespace JevSurvivors
         {
             MenuDriver.Instance?.PageShown(__instance);
             if (__instance is MainGamePage hud) MenuDriver.Instance?.OnRunStarted(hud);
+            if (__instance is OpenTreasurePage treasure) MenuDriver.Instance?.OnTreasure(treasure);
         });
     }
 
@@ -64,5 +65,47 @@ namespace JevSurvivors
     internal static class StageSelectPatch
     {
         private static void Postfix(StageSelectPage __instance) => Safe.Run("OnStageSelect", () => MenuDriver.Instance?.OnStageSelect(__instance));
+    }
+
+    [HarmonyPatch(typeof(LevelUpPage), "EnableLevelupOptions")]
+    internal static class LevelUpPatch
+    {
+        private static void Postfix(LevelUpPage __instance) => Safe.Run("OnLevelUp", () => MenuDriver.Instance?.OnLevelUp(__instance));
+    }
+
+    [HarmonyPatch(typeof(ArcanaMainSelectionPage), "OnShowStart")]
+    internal static class ArcanaPatch
+    {
+        private static void Postfix(ArcanaMainSelectionPage __instance) => Safe.Run("OnArcana", () => MenuDriver.Instance?.OnArcana(__instance));
+    }
+
+    [HarmonyPatch(typeof(ItemFoundPage), "OnShowStart")]
+    internal static class ItemFoundPatch
+    {
+        private static void Postfix(ItemFoundPage __instance) => Safe.Run("OnItemFound", () => MenuDriver.Instance?.OnItemFound(__instance));
+    }
+
+    [HarmonyPatch(typeof(CharacterFoundPage), "OnShowStart")]
+    internal static class CharacterFoundPatch
+    {
+        private static void Postfix(CharacterFoundPage __instance) => Safe.Run("OnCharacterFound", () => MenuDriver.Instance?.OnCharacterFound(__instance));
+    }
+
+    [HarmonyPatch(typeof(GameOverPage), "OnShowStart")]
+    internal static class GameOverPatch
+    {
+        private static void Postfix(GameOverPage __instance) => Safe.Run("OnGameOver", () => MenuDriver.Instance?.OnGameOver(__instance));
+    }
+
+    [HarmonyPatch(typeof(RecapPage), "OnShowStart")]
+    internal static class RecapPatch
+    {
+        private static void Postfix(RecapPage __instance) => Safe.Run("OnRecap", () => MenuDriver.Instance?.OnRecap(__instance));
+    }
+
+    [HarmonyPatch(typeof(PausePage), "OnShowStart")]
+    internal static class PausePatch
+    {
+        private static void Postfix(PausePage __instance) => Safe.Run("OnPause", () => MenuDriver.Instance?.OnPause(__instance));
     }
 }

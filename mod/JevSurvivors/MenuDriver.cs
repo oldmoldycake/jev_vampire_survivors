@@ -27,8 +27,15 @@ namespace JevSurvivors
         /// <summary>Pages with a dedicated handler; the safety net leaves these alone.</summary>
         private static readonly HashSet<Type> Handled = new HashSet<Type>
         {
-            typeof(WarningPage), typeof(MainMenuPage), typeof(CharacterSelectionPage), typeof(WeaponSelectionPage),
-            typeof(StageSelectPage), typeof(MainGamePage),
+            typeof(WarningPage), typeof(MainMenuPage), typeof(CharacterSelectionPage), typeof(WeaponSelectionPage), typeof(StageSelectPage),
+            typeof(MainGamePage), typeof(LevelUpPage), typeof(ArcanaMainSelectionPage), typeof(OpenTreasurePage),
+            typeof(ItemFoundPage), typeof(CharacterFoundPage), typeof(GameOverPage), typeof(RecapPage), typeof(PausePage),
+        };
+
+        /// <summary>Decorative pages the safety net must never nudge.</summary>
+        private static readonly HashSet<Type> Ignored = new HashSet<Type>
+        {
+            typeof(BackgroundPage), typeof(MenuBannerPage),
         };
 
         public int RunsStarted { get; private set; }
@@ -54,9 +61,22 @@ namespace JevSurvivors
             _nudged.Remove(page);
         }
 
+        /// <summary>Any tracked page without a handler that stays open too long gets its Enter action once.</summary>
         public void Update()
         {
-            // safety net arrives in Task 6
+            if (!CanAutomate() || _shownAt.Count == 0) return;
+            float now = Time.realtimeSinceStartup;
+            foreach (var kv in _shownAt)
+            {
+                var page = kv.Key;
+                if (page == null || Handled.Contains(page.GetType()) || Ignored.Contains(page.GetType()) || _nudged.Contains(page)) continue;
+                if (now - kv.Value < Plugin.UnknownPageTimeoutS.Value || !page.gameObject.activeInHierarchy) continue;
+                _nudged.Add(page);
+                Plugin.Log.LogWarning($"unknown page {page.GetType().Name} open for {now - kv.Value:F0}s; pressing Enter for it");
+                try { page.OnEnterPressed(); }
+                catch (Exception e) { Plugin.Log.LogError($"OnEnterPressed on {page.GetType().Name} failed: {e.Message}"); }
+                break;
+            }
         }
 
         // ------------------------------------------------------------------ helpers
@@ -260,6 +280,240 @@ namespace JevSurvivors
             Movement.Clear();
             var gm = GM.Core;
             Plugin.Log.LogInfo($"run started: {gm?.Player?.CharacterType} on {gm?.PlayerOptions?.Config?.SelectedStage}");
+        }
+
+        // ------------------------------------------------------------------ in-run pages
+        public void OnLevelUp(LevelUpPage page) => _plugin.StartCoroutine(LevelUp(page));
+
+        private IEnumerator LevelUp(LevelUpPage page)
+        {
+            yield return null;   // let EnableLevelupOptions finish
+            if (!CanAutomate() || page == null) yield break;
+            var items = new List<LevelUpItemUI>();
+            var options = new JArray();
+            var owned = OwnedTypes();
+            foreach (var ui in page.LevelUpItems)
+            {
+                if (ui == null) continue;
+                items.Add(ui);
+                bool isWeapon = ui._type != WeaponType.VOID;
+                string id = isWeapon ? ui._type.ToString() : ui._itemType.ToString();
+                string kind = ui._isLimitBreak ? "limit_break" : ui.IsWeapon() ? "weapon" : ui.IsPowerUp() ? "passive" : "item";
+                string name = ui._data?.name ?? ui._itemData?.name ?? id;
+                string desc = ui._levelData?.description ?? ui._data?.description ?? ui._itemData?.description ?? "";
+                options.Add(new JObject
+                {
+                    ["index"] = items.Count - 1, ["id"] = id, ["name"] = name, ["kind"] = kind,
+                    ["level"] = ui._currentLevel, ["is_new"] = ui.IsNew(), ["description"] = desc,
+                    ["evolution_ready"] = EvolutionReady(ui, owned),
+                });
+            }
+            if (items.Count == 0)
+            {
+                Plugin.Log.LogWarning("level up: no items offered, skipping");
+                page.Skip();
+                yield break;
+            }
+            var evt = Event("level_up", options);
+            evt["build"] = Build();
+            var box = Ask(evt);
+            while (!box.Done) yield return null;
+            if (!CanAutomate() || page == null || !page.gameObject.activeInHierarchy) yield break;
+            int idx = PickIndex(box, items.Count);
+            Plugin.Log.LogInfo($"level up: picked {(string)options[idx]["name"]} ({(box.TimedOut ? "default" : "brain")})");
+            items[idx].Select();
+        }
+
+        private static HashSet<WeaponType> OwnedTypes()
+        {
+            var set = new HashSet<WeaponType>();
+            var p = GM.Core?.Player;
+            if (p == null) return set;
+            foreach (var e in p.WeaponsManager.ActiveEquipment) if (e != null) set.Add(e.Type);
+            foreach (var e in p.AccessoriesManager.ActiveEquipment) if (e != null) set.Add(e.Type);
+            return set;
+        }
+
+        /// <summary>True when this weapon option's evolution partners are all owned (spec section 4).</summary>
+        private static bool EvolutionReady(LevelUpItemUI ui, HashSet<WeaponType> owned)
+        {
+            if (!ui.IsWeapon() || ui._data == null || ui._data.evoSynergy == null || ui._data.evoSynergy.Length == 0) return false;
+            foreach (var t in ui._data.evoSynergy) if (!owned.Contains(t)) return false;
+            return true;
+        }
+
+        private static JObject Build()
+        {
+            var gm = GM.Core;
+            var p = gm?.Player;
+            var weapons = new JArray();
+            var passives = new JArray();
+            var b = new JObject { ["weapons"] = weapons, ["passives"] = passives };
+            if (p == null) return b;
+            foreach (var e in p.WeaponsManager.ActiveEquipment) if (e != null) weapons.Add($"{e.Type} L{e.Level}");
+            foreach (var e in p.AccessoriesManager.ActiveEquipment) if (e != null) passives.Add($"{e.Type} L{e.Level}");
+            b["level"] = p.Level;
+            b["minute"] = gm.Stage != null ? gm.Stage.CurrentMinute : 0;
+            return b;
+        }
+
+        public void OnArcana(ArcanaMainSelectionPage page) => _plugin.StartCoroutine(Arcana(page));
+
+        private IEnumerator Arcana(ArcanaMainSelectionPage page)
+        {
+            float deadline = Time.realtimeSinceStartup + 6f;
+            while (page != null && !page._hasFinishedPopulationAnimation && Time.realtimeSinceStartup < deadline) yield return null;
+            yield return new WaitForSecondsRealtime(0.5f);
+            if (!CanAutomate() || page == null) yield break;
+            var cards = new List<ArcanaCardUI>();
+            var options = new JArray();
+            if (page._unlockedCards != null && page._unlockedCards.Count > 0)
+            {
+                foreach (var card in page._unlockedCards)
+                {
+                    if (card == null) continue;
+                    var data = card.GetData();
+                    if (data == null) continue;
+                    AddArcanaOption(card, data, cards, options);
+                }
+            }
+            else
+            {
+                foreach (var go in page._spawned)
+                {
+                    var card = go != null ? go.GetComponent<ArcanaCardUI>() : null;
+                    var data = card != null ? card.GetData() : null;
+                    if (data == null || !data.unlocked) continue;
+                    AddArcanaOption(card, data, cards, options);
+                }
+            }
+            if (cards.Count == 0)
+            {
+                Plugin.Log.LogInfo("arcana: nothing selectable, skipping");
+                page.Skip();
+                yield break;
+            }
+            var box = Ask(Event("arcana_select", options));
+            while (!box.Done) yield return null;
+            if (!CanAutomate() || page == null || !page.gameObject.activeInHierarchy) yield break;
+            var pick = cards[PickIndex(box, cards.Count)];
+            Plugin.Log.LogInfo($"arcana: {pick.GetArcanaType()}");
+            page.SetInfo(pick.GetData(), pick.GetArcanaType(), pick);
+            yield return null;
+            page.Select();
+            yield return new WaitForSecondsRealtime(3f);
+            if (page != null && page.gameObject.activeInHierarchy)
+            {
+                Plugin.Log.LogWarning("arcana: select did not close the page, skipping");
+                page.Skip();
+            }
+        }
+
+        private static void AddArcanaOption(ArcanaCardUI card, ArcanaData data, List<ArcanaCardUI> cards, JArray options)
+        {
+            cards.Add(card);
+            options.Add(new JObject
+            {
+                ["index"] = cards.Count - 1, ["id"] = card.GetArcanaType().ToString(), ["name"] = data.name ?? "",
+                ["kind"] = "arcana", ["level"] = 1, ["is_new"] = true, ["description"] = data.description ?? "",
+            });
+        }
+
+        public void OnTreasure(OpenTreasurePage page) => _plugin.StartCoroutine(Treasure(page));
+
+        private IEnumerator Treasure(OpenTreasurePage page)
+        {
+            float deadline = Time.realtimeSinceStartup + 120f;
+            yield return new WaitForSecondsRealtime(0.5f);
+            while (page != null && page.gameObject.activeInHierarchy && Time.realtimeSinceStartup < deadline)
+            {
+                if (!CanAutomate()) yield break;
+                if (!page._openButtonPressed)
+                {
+                    Plugin.Log.LogInfo("treasure: opening");
+                    page.OpenTreasure();
+                }
+                else if (page._isPlaying && page._canSkip && page._animCanBeSkippedPastThisPoint && !page._isSkipped)
+                {
+                    page.Skip();
+                }
+                if (page.DoneButton != null && page.DoneButton.activeInHierarchy && !page._doneButtonPressed)
+                {
+                    Plugin.Log.LogInfo("treasure: claiming");
+                    page.ClaimTreasure();
+                    yield break;
+                }
+                yield return new WaitForSecondsRealtime(0.25f);
+            }
+            if (page != null && page.gameObject.activeInHierarchy) Plugin.Log.LogWarning("treasure: still open after 120s");
+        }
+
+        public void OnItemFound(ItemFoundPage page) => _plugin.StartCoroutine(Dismiss(page, () => page.Receive(), "item found"));
+
+        public void OnCharacterFound(CharacterFoundPage page) => _plugin.StartCoroutine(CharacterFound(page));
+
+        private IEnumerator CharacterFound(CharacterFoundPage page)
+        {
+            yield return new WaitForSecondsRealtime(Plugin.MenuDelayS.Value);
+            if (!CanAutomate() || page == null) yield break;
+            page.Reveal();
+            yield return new WaitForSecondsRealtime(1.5f);
+            if (page != null) page.CollectCharacter();
+        }
+
+        private IEnumerator Dismiss(BaseUIPage page, Action action, string label)
+        {
+            yield return new WaitForSecondsRealtime(Plugin.MenuDelayS.Value);
+            if (!CanAutomate() || page == null) yield break;
+            Plugin.Log.LogInfo($"{label}: dismissing");
+            action();
+        }
+
+        public void OnGameOver(GameOverPage page) => _plugin.StartCoroutine(GameOver(page));
+
+        private IEnumerator GameOver(GameOverPage page)
+        {
+            Movement.Clear();
+            var gm = GM.Core;
+            var p = gm?.Player;
+            var summary = new JObject
+            {
+                ["character"] = p?.CharacterType.ToString(),
+                ["stage"] = gm?.PlayerOptions?.Config?.SelectedStage.ToString(),
+                ["seconds"] = gm != null ? Mathf.RoundToInt(gm.SurvivedSeconds) : 0,
+                ["level"] = p?.Level ?? 0,
+                ["kills"] = ReadKills(),
+                ["stage_complete"] = page._stageComplete,
+            };
+            RunsFinished++;
+            Plugin.Log.LogInfo($"game over: {summary.ToString(Newtonsoft.Json.Formatting.None)}");
+            if (_t.Connected)
+                _t.Request(new JObject { ["type"] = "event", ["event"] = "game_over", ["summary"] = summary }, 2f, _ => { }, () => { });
+            yield return new WaitForSecondsRealtime(2f);
+            if (!CanAutomate() || page == null) yield break;
+            page.Quit();
+        }
+
+        private static int ReadKills()
+        {
+            var hud = UnityEngine.Object.FindFirstObjectByType<MainGamePage>();
+            string text = hud != null && hud.KillsText != null ? hud.KillsText.text : null;
+            if (string.IsNullOrEmpty(text)) return 0;
+            var digits = new System.Text.StringBuilder();
+            foreach (char c in text) if (char.IsDigit(c)) digits.Append(c);
+            return int.TryParse(digits.ToString(), out var n) ? n : 0;
+        }
+
+        public void OnRecap(RecapPage page) => _plugin.StartCoroutine(Dismiss(page, () => page.DoneClicked(), "recap"));
+
+        public void OnPause(PausePage page) => _plugin.StartCoroutine(Pause(page));
+
+        private IEnumerator Pause(PausePage page)
+        {
+            yield return new WaitForSecondsRealtime(Plugin.MenuDelayS.Value);
+            if (!CanAutomate() || page == null || !page.gameObject.activeInHierarchy) yield break;
+            Plugin.Log.LogInfo("pause: resuming");
+            page.ReturnToGame();
         }
     }
 }
