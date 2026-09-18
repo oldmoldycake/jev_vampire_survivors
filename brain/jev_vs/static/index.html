@@ -156,6 +156,7 @@
       if (m.type === "snapshot") {
         renderStats(m.stats); Object.values(m.decisions || {}).forEach(renderDecision);
         (m.log || []).slice().reverse().forEach(addLog); $("s-run").textContent = (m.run && m.run.character) || "-";
+        (m.runs || []).forEach(addRun);
       } else if (m.type === "stats") renderStats(m);
       else if (m.type === "decision") renderDecision(m);
       else if (m.type === "event") addLog(m);

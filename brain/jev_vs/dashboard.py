@@ -26,7 +26,7 @@ def make_app(server: PluginServer) -> web.Application:
         q = server.hub.subscribe()
         await ws.send_str(json.dumps({
             "type": "snapshot", "stats": server.stats.snapshot(), "decisions": server.latest_decisions,
-            "log": server.recent_log, "run": server.current_run,
+            "log": server.recent_log, "run": server.current_run, "runs": server.run_history,
         }))
 
         async def pump() -> None:
@@ -49,6 +49,8 @@ def make_app(server: PluginServer) -> web.Application:
                 try:
                     data = json.loads(msg.data)
                 except json.JSONDecodeError:
+                    continue
+                if not isinstance(data, dict):
                     continue
                 if data.get("type") == "control":
                     await server.send_control(bool(data.get("automation", True)))

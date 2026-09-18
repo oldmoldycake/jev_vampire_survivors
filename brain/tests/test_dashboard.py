@@ -71,3 +71,25 @@ async def test_slow_ws_client_is_dropped_without_blocking(client, plugin_server)
     assert plugin_server.hub.client_count == 0
     msg = await ws.receive()
     assert msg.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING, WSMsgType.TEXT)
+
+
+async def test_ws_ignores_non_object_json(client, plugin_server):
+    reader, writer = await asyncio.open_connection("127.0.0.1", plugin_server.port)
+    await asyncio.sleep(0.05)
+    ws = await client.ws_connect("/ws")
+    await ws.receive()   # snapshot
+    await ws.send_str("42")
+    await ws.send_str("[1, 2]")
+    await ws.send_str(json.dumps({"type": "control", "automation": False}))
+    line = json.loads(await asyncio.wait_for(reader.readline(), 2))
+    assert line == {"type": "control", "automation": False}
+    writer.close()
+    await ws.close()
+
+
+async def test_snapshot_includes_run_history(client, plugin_server):
+    plugin_server.run_history.append({"character": "IMELDA", "stage": "FOREST", "seconds": 90, "level": 4, "jev_calls": 3, "fallback_calls": 0})
+    ws = await client.ws_connect("/ws")
+    snap = json.loads((await ws.receive()).data)
+    assert snap["runs"][0]["character"] == "IMELDA"
+    await ws.close()

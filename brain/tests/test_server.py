@@ -114,6 +114,7 @@ async def test_events_drive_run_log_and_picks(tmp_path):
                          "summary": {"character": "IMELDA", "stage": "FOREST", "seconds": 90, "level": 4, "kills": 12, "stage_complete": False}})
     assert (await _recv(reader)) == {"id": 13, "type": "noop"}
     assert srv.runlog.active is False
+    assert srv.run_history[-1]["character"] == "IMELDA" and srv.run_history[-1]["seconds"] == 90
     run_dirs = [p for p in Path(tmp_path).iterdir() if p.is_dir()]
     assert len(run_dirs) == 1
     summary = json.loads((run_dirs[0] / "summary.json").read_text())

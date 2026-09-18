@@ -33,6 +33,7 @@ class PluginServer:
         self.latest_decisions: dict[str, dict] = {}
         self.recent_log: list[dict] = []
         self.current_run: dict = {}
+        self.run_history: list[dict] = []
 
     # ------------------------------------------------------------ lifecycle
     @property
@@ -170,6 +171,8 @@ class PluginServer:
             summary = msg.get("summary", {})
             self.runlog.event({"id": mid, "event": event, "summary": summary})
             written = self.runlog.end_run(summary)
+            self.run_history.append({**written, **self.stats.snapshot()})
+            del self.run_history[:-50]
             self._note(f"game over: {summary.get('character')} on {summary.get('stage')} survived {summary.get('seconds')}s level {summary.get('level')}")
             self.hub.publish({"type": "run", "phase": "end", "summary": written})
             self.current_run = {}
