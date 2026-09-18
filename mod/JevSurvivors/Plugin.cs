@@ -2,6 +2,7 @@ using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 namespace JevSurvivors
@@ -30,6 +31,8 @@ namespace JevSurvivors
         public static ConfigEntry<float> PauseBetweenRunsS;
         public static ConfigEntry<KeyCode> ToggleKey;
 
+        internal Transport Transport { get; private set; }
+
         private Harmony _harmony;
 
         private void Awake()
@@ -51,6 +54,8 @@ namespace JevSurvivors
             ToggleKey = Config.Bind("Hotkeys", "ToggleKey", KeyCode.F9, "Toggle automation on and off");
 
             Automation = AutoplayOnBoot.Value;
+            Transport = new Transport(Host.Value, Port.Value, HelloJson);
+            Transport.Start();
             _harmony = new Harmony(Id);
             _harmony.PatchAll(typeof(Plugin).Assembly);
             Log.LogInfo($"{Name} {Version} loaded; automation={Automation}");
@@ -59,7 +64,29 @@ namespace JevSurvivors
         private void Update()
         {
             if (Input.GetKeyDown(ToggleKey.Value)) SetAutomation(!Automation, "hotkey");
+            Transport.Pump(OnUnsolicited);
             Probe.Update();
+        }
+
+        private static string HelloJson()
+        {
+            return new JObject
+            {
+                ["type"] = "hello",
+                ["game_version"] = Application.version,
+                ["plugin_version"] = Version,
+            }.ToString(Newtonsoft.Json.Formatting.None);
+        }
+
+        private void OnUnsolicited(JObject msg)
+        {
+            var type = (string)msg["type"];
+            if (type == "control")
+            {
+                SetAutomation((bool?)msg["automation"] ?? true, "brain");
+                return;
+            }
+            Log.LogInfo($"ignoring unsolicited message type={type}");
         }
 
         public void SetAutomation(bool on, string why)
@@ -70,6 +97,7 @@ namespace JevSurvivors
 
         private void OnDestroy()
         {
+            Transport?.Stop();
             _harmony?.UnpatchSelf();
         }
     }
