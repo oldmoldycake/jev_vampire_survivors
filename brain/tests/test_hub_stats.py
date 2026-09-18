@@ -52,3 +52,22 @@ def test_stats_counts_and_cost():
     assert s.snapshot()["plugin_connected"] is True
     s.reset_run()
     assert s.snapshot()["calls"] == 0
+
+
+def test_stats_counts_a_human_pick_as_neither_jev_nor_fallback():
+    s = Stats()
+    s.record(_decision(source="jev", latency=100.0, tokens=500))
+    s.record(_decision(source="human", latency=0.0, tokens=0))
+    snap = s.snapshot()
+    assert snap["calls"] == 2  # it was still a decision
+    assert snap["jev_calls"] == 1 and snap["fallback_calls"] == 0
+    assert snap["jev_ok"] is True  # a pinned pick is not an API failure
+    assert snap["last_latency_ms"] == 100.0 and snap["avg_latency_ms"] == 100.0
+
+
+def test_a_human_pick_does_not_clear_a_fallback_warning():
+    s = Stats()
+    s.record(_decision(source="fallback", latency=0.0, tokens=0))
+    assert s.snapshot()["jev_ok"] is False
+    s.record(_decision(source="human", latency=0.0, tokens=0))
+    assert s.snapshot()["jev_ok"] is False  # the lamp stays on the last thing Jev actually did

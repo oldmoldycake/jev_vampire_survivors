@@ -30,6 +30,11 @@ class Stats:
             self.jev_ok = True
             self.last_latency_ms = d.latency_ms
             self._latency_sum += d.latency_ms
+        elif d.source == "human":
+            # A human pinned this pick, so no API call was made and nothing went wrong.
+            # Counting it as a fallback would light the dashboard's jev lamp for a failure
+            # that did not happen (spec section 3.4). It stays in `calls` and nowhere else.
+            pass
         else:
             self.fallback_calls += 1
             self.jev_ok = False
