@@ -1,4 +1,5 @@
 """python -m jev_vs  |  uv run jev-vs"""
+
 from __future__ import annotations
 
 import argparse
@@ -44,7 +45,12 @@ async def run(config: Config) -> None:
     server, app = build(config)
     await server.start()
     runner = await run_dashboard(app, config.dashboard_host, config.dashboard_port)
-    log.info("brain ready: plugin port %d, dashboard http://%s:%d/", server.port, config.dashboard_host, config.dashboard_port)
+    log.info(
+        "brain ready: plugin port %d, dashboard http://%s:%d/",
+        server.port,
+        config.dashboard_host,
+        config.dashboard_port,
+    )
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):

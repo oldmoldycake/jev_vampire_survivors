@@ -2,8 +2,6 @@ import asyncio
 import json
 from pathlib import Path
 
-import pytest
-
 from jev_vs.config import Config
 from jev_vs.decide import Decider
 from jev_vs.hub import Hub
@@ -68,7 +66,7 @@ async def test_hello_and_tick_round_trip(tmp_path):
 
 async def test_overlapping_tick_gets_reused_reply(tmp_path):
     jev = SlowJev()
-    srv, hub, stats, reader, writer = await _start(tmp_path, jev)
+    srv, _hub, stats, reader, writer = await _start(tmp_path, jev)
     await _send(writer, {"id": 1, "type": "tick", "t": 0.0, "state": make_state()})
     await asyncio.sleep(0.05)
     await _send(writer, {"id": 2, "type": "tick", "t": 0.25, "state": make_state()})
@@ -83,8 +81,8 @@ async def test_overlapping_tick_gets_reused_reply(tmp_path):
 
 
 async def test_stop_cancels_in_flight_tasks(tmp_path):
-    jev = SlowJev()   # first ask blocks until the gate is set; we never set it
-    srv, hub, stats, reader, writer = await _start(tmp_path, jev)
+    jev = SlowJev()  # first ask blocks until the gate is set; we never set it
+    srv, _hub, _stats, reader, writer = await _start(tmp_path, jev)
     await _send(writer, {"id": 1, "type": "tick", "t": 0.0, "state": make_state()})
     await asyncio.sleep(0.05)
     assert len(srv._tasks) == 1
@@ -96,24 +94,66 @@ async def test_stop_cancels_in_flight_tasks(tmp_path):
 async def test_events_drive_run_log_and_picks(tmp_path):
     # ANTONIO's 1% is below SAMPLE_FLOOR (5%), so the character-select sampling step
     # (see Decider.pick / decide.SAMPLE_FLOOR) deterministically keeps only IMELDA.
-    jev = FakeJev(script={"character": ("IMELDA", {"IMELDA": 0.99, "ANTONIO": 0.01}, 0.8),
-                         "level_up": ("SPINACH", {"SPINACH": 1.0}, 1.0)})
-    srv, hub, stats, reader, writer = await _start(tmp_path, jev)
-    chars = [{"id": "ANTONIO", "name": "Antonio", "description": "d"}, {"id": "IMELDA", "name": "Imelda", "description": "d"}]
+    jev = FakeJev(
+        script={
+            "character": ("IMELDA", {"IMELDA": 0.99, "ANTONIO": 0.01}, 0.8),
+            "level_up": ("SPINACH", {"SPINACH": 1.0}, 1.0),
+        }
+    )
+    srv, _hub, _stats, reader, writer = await _start(tmp_path, jev)
+    chars = [
+        {"id": "ANTONIO", "name": "Antonio", "description": "d"},
+        {"id": "IMELDA", "name": "Imelda", "description": "d"},
+    ]
     await _send(writer, {"id": 10, "type": "event", "event": "character_select", "options": chars})
     r = await _recv(reader)
-    assert r == {"id": 10, "type": "pick", "index": 1, "choice": "IMELDA",
-                 "probabilities": {"IMELDA": 0.99, "ANTONIO": 0.01}, "confidence": 0.8, "source": "jev"}
+    assert r == {
+        "id": 10,
+        "type": "pick",
+        "index": 1,
+        "choice": "IMELDA",
+        "probabilities": {"IMELDA": 0.99, "ANTONIO": 0.01},
+        "confidence": 0.8,
+        "source": "jev",
+    }
     assert srv.runlog.active is True
-    await _send(writer, {"id": 11, "type": "event", "event": "stage_select",
-                         "options": [{"id": "FOREST", "name": "Mad Forest", "description": "d"}]})
+    await _send(
+        writer,
+        {
+            "id": 11,
+            "type": "event",
+            "event": "stage_select",
+            "options": [{"id": "FOREST", "name": "Mad Forest", "description": "d"}],
+        },
+    )
     assert (await _recv(reader))["choice"] == "FOREST"
-    await _send(writer, {"id": 12, "type": "event", "event": "level_up",
-                         "options": [{"index": 0, "id": "SPINACH", "name": "Spinach", "kind": "passive", "level": 1}],
-                         "build": {"weapons": [], "passives": []}})
+    await _send(
+        writer,
+        {
+            "id": 12,
+            "type": "event",
+            "event": "level_up",
+            "options": [{"index": 0, "id": "SPINACH", "name": "Spinach", "kind": "passive", "level": 1}],
+            "build": {"weapons": [], "passives": []},
+        },
+    )
     assert (await _recv(reader))["index"] == 0
-    await _send(writer, {"id": 13, "type": "event", "event": "game_over",
-                         "summary": {"character": "IMELDA", "stage": "FOREST", "seconds": 90, "level": 4, "kills": 12, "stage_complete": False}})
+    await _send(
+        writer,
+        {
+            "id": 13,
+            "type": "event",
+            "event": "game_over",
+            "summary": {
+                "character": "IMELDA",
+                "stage": "FOREST",
+                "seconds": 90,
+                "level": 4,
+                "kills": 12,
+                "stage_complete": False,
+            },
+        },
+    )
     assert (await _recv(reader)) == {"id": 13, "type": "noop"}
     assert srv.runlog.active is False
     assert srv.run_history[-1]["character"] == "IMELDA" and srv.run_history[-1]["seconds"] == 90
@@ -130,10 +170,17 @@ async def test_events_drive_run_log_and_picks(tmp_path):
 
 
 async def test_game_over_with_no_active_run_does_not_add_history_row(tmp_path):
-    srv, hub, stats, reader, writer = await _start(tmp_path, FakeJev())
+    srv, _hub, _stats, reader, writer = await _start(tmp_path, FakeJev())
     before = len(srv.run_history)
-    await _send(writer, {"id": 1, "type": "event", "event": "game_over",
-                         "summary": {"character": "NOBODY", "stage": "NONE", "seconds": 0, "level": 1}})
+    await _send(
+        writer,
+        {
+            "id": 1,
+            "type": "event",
+            "event": "game_over",
+            "summary": {"character": "NOBODY", "stage": "NONE", "seconds": 0, "level": 1},
+        },
+    )
     assert (await _recv(reader)) == {"id": 1, "type": "noop"}
     assert len(srv.run_history) == before
     writer.close()
@@ -142,24 +189,29 @@ async def test_game_over_with_no_active_run_does_not_add_history_row(tmp_path):
 
 async def test_character_select_carries_recently_played_from_run_history(tmp_path):
     jev = FakeJev(script={"character": ("IMELDA", {"IMELDA": 1.0}, 0.9)})
-    srv, hub, stats, reader, writer = await _start(tmp_path, jev)
+    srv, _hub, _stats, reader, writer = await _start(tmp_path, jev)
     # Two finished runs, oldest first, as run_history stores them.
     srv.run_history.append({"character": "ANTONIO", "stage": "FOREST"})
     srv.run_history.append({"character": "IMELDA", "stage": "DAIRY_PLANT"})
-    chars = [{"id": "ANTONIO", "name": "Antonio", "description": "d"}, {"id": "IMELDA", "name": "Imelda", "description": "d"}]
+    chars = [
+        {"id": "ANTONIO", "name": "Antonio", "description": "d"},
+        {"id": "IMELDA", "name": "Imelda", "description": "d"},
+    ]
     await _send(writer, {"id": 1, "type": "event", "event": "character_select", "options": chars})
     await _recv(reader)
     state = jev.calls[-1][0]
-    assert state["recently_played"] == ["IMELDA", "ANTONIO"]   # most recent first
+    assert state["recently_played"] == ["IMELDA", "ANTONIO"]  # most recent first
     writer.close()
     await srv.stop()
 
 
 async def test_pick_reply_echoes_options_own_index(tmp_path):
     jev = FakeJev(script={"character": ("B", {"A": 0.0, "B": 1.0}, 1.0)})
-    srv, hub, stats, reader, writer = await _start(tmp_path, jev)
-    opts = [{"id": "A", "name": "A", "index": 7, "description": "d"},
-            {"id": "B", "name": "B", "index": 9, "description": "d"}]
+    srv, _hub, _stats, reader, writer = await _start(tmp_path, jev)
+    opts = [
+        {"id": "A", "name": "A", "index": 7, "description": "d"},
+        {"id": "B", "name": "B", "index": 9, "description": "d"},
+    ]
     await _send(writer, {"id": 1, "type": "event", "event": "character_select", "options": opts})
     reply = await _recv(reader)
     assert reply["index"] == 9 and reply["choice"] == "B"
@@ -168,7 +220,7 @@ async def test_pick_reply_echoes_options_own_index(tmp_path):
 
 
 async def test_bad_line_is_skipped_and_connection_survives(tmp_path):
-    srv, hub, stats, reader, writer = await _start(tmp_path, FakeJev())
+    srv, _hub, _stats, reader, writer = await _start(tmp_path, FakeJev())
     writer.write(b"garbage\n")
     await _send(writer, {"id": 5, "type": "tick", "t": 0.0, "state": make_state()})
     assert (await _recv(reader))["id"] == 5
@@ -177,7 +229,7 @@ async def test_bad_line_is_skipped_and_connection_survives(tmp_path):
 
 
 async def test_send_control_reaches_plugin_and_reports_absence(tmp_path):
-    srv, hub, stats, reader, writer = await _start(tmp_path, FakeJev())
+    srv, _hub, stats, reader, writer = await _start(tmp_path, FakeJev())
     await _send(writer, {"type": "hello"})
     await asyncio.sleep(0.05)
     assert await srv.send_control(False) is True

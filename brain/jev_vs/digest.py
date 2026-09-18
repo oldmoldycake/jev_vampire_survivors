@@ -3,6 +3,7 @@
 Coordinates are relative to the player, y up. Distances are compared to the
 visible half-height so the buckets mean the same thing at any zoom.
 """
+
 from __future__ import annotations
 
 import math
@@ -11,7 +12,14 @@ from dataclasses import asdict, dataclass, field
 from .questions import Thresholds, pickup_category
 
 SECTORS: list[str] = [
-    "north", "north_east", "east", "south_east", "south", "south_west", "west", "north_west",
+    "north",
+    "north_east",
+    "east",
+    "south_east",
+    "south",
+    "south_west",
+    "west",
+    "north_west",
 ]
 
 _DISTANCE_WEIGHT = {"touching": 4.0, "close": 2.0, "mid": 1.0, "far": 0.5}
@@ -20,7 +28,7 @@ _DISTANCE_ORDER = ["touching", "close", "mid", "far"]
 
 def sector_of(dx: float, dy: float) -> str:
     """Compass sector of a point relative to the player; north is +y, clockwise."""
-    angle = math.degrees(math.atan2(dx, dy)) % 360.0   # 0 = north, 90 = east
+    angle = math.degrees(math.atan2(dx, dy)) % 360.0  # 0 = north, 90 = east
     return SECTORS[int((angle + 22.5) // 45) % 8]
 
 
@@ -137,7 +145,7 @@ class BlockMemory:
     def __init__(self, th: Thresholds) -> None:
         self._th = th
         self._blocked_at: dict[str, float] = {}
-        self._trail: list[tuple[float, float, float, str | None]] = []   # (seconds, x, y, applied_direction)
+        self._trail: list[tuple[float, float, float, str | None]] = []  # (seconds, x, y, applied_direction)
 
     def record(self, direction: str, now: float) -> None:
         """Remember (or refresh) that `direction` failed to move the survivor at run-clock `now`."""
@@ -170,7 +178,7 @@ class BlockMemory:
         old_enough = [(i, s) for i, s in enumerate(self._trail) if newest[0] - s[0] >= th.stuck_window_s]
         if not old_enough:
             return False
-        anchor_i, anchor = old_enough[-1]   # the most recent sample that is still a full window old
+        anchor_i, anchor = old_enough[-1]  # the most recent sample that is still a full window old
         dist = math.hypot(newest[1] - anchor[1], newest[2] - anchor[2])
         frac = dist / half_h if half_h > 0 else float("inf")
         if frac >= th.stuck_move_frac:

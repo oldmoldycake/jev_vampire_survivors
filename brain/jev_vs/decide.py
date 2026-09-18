@@ -1,4 +1,5 @@
 """Decider: digest -> Ask -> Jev -> Decision, with heuristic fallbacks."""
+
 from __future__ import annotations
 
 import logging
@@ -29,18 +30,24 @@ class Decision:
     probabilities: dict[str, float]
     confidence: float
     latency_ms: float
-    source: str                       # "jev" | "fallback"
+    source: str  # "jev" | "fallback"
     input_tokens: int = 0
     instructions: str = ""
     labels: dict[str, str] = field(default_factory=dict)
-    sampled: bool = False             # True when the choice came from the variety sampler, not Jev's raw top answer
+    sampled: bool = False  # True when the choice came from the variety sampler, not Jev's raw top answer
 
     def to_dict(self) -> dict:
         return {
-            "kind": self.kind, "choice": self.choice, "index": self.index,
-            "probabilities": self.probabilities, "confidence": self.confidence,
-            "latency_ms": round(self.latency_ms, 1), "source": self.source,
-            "input_tokens": self.input_tokens, "instructions": self.instructions, "labels": self.labels,
+            "kind": self.kind,
+            "choice": self.choice,
+            "index": self.index,
+            "probabilities": self.probabilities,
+            "confidence": self.confidence,
+            "latency_ms": round(self.latency_ms, 1),
+            "source": self.source,
+            "input_tokens": self.input_tokens,
+            "instructions": self.instructions,
+            "labels": self.labels,
             "sampled": self.sampled,
         }
 
@@ -118,9 +125,16 @@ class Decider:
             choice, probs, conf, source = fallback_direction(d), {}, 0.0, "fallback"
             probs = {k: (1.0 if k == choice else 0.0) for k in ask.keys}
         return d, Decision(
-            kind="direction", choice=choice, index=ask.keys.index(choice), probabilities=probs,
-            confidence=conf, latency_ms=latency, source=source, input_tokens=tokens,
-            instructions=ask.instructions, labels=ask.labels,
+            kind="direction",
+            choice=choice,
+            index=ask.keys.index(choice),
+            probabilities=probs,
+            confidence=conf,
+            latency_ms=latency,
+            source=source,
+            input_tokens=tokens,
+            instructions=ask.instructions,
+            labels=ask.labels,
         )
 
     def _sample_choice(self, probs: dict[str, float], keys: list[str]) -> str | None:
@@ -135,10 +149,11 @@ class Decider:
             upto += p
             if r <= upto:
                 return k
-        return candidates[-1][0]   # floating-point rounding fallback
+        return candidates[-1][0]  # floating-point rounding fallback
 
-    async def pick(self, kind: str, options: list[dict], build: dict | None = None,
-                    recent: list[str] | None = None) -> Decision:
+    async def pick(
+        self, kind: str, options: list[dict], build: dict | None = None, recent: list[str] | None = None
+    ) -> Decision:
         if not options:
             raise ValueError(f"{kind}: no options to pick from")
         ask = options_question(kind, options, build, recent=recent)
@@ -155,7 +170,15 @@ class Decider:
                 choice = picked
                 sampled = True
         return Decision(
-            kind=kind, choice=choice, index=ask.keys.index(choice), probabilities=probs,
-            confidence=conf, latency_ms=latency, source=source, input_tokens=tokens,
-            instructions=ask.instructions, labels=ask.labels, sampled=sampled,
+            kind=kind,
+            choice=choice,
+            index=ask.keys.index(choice),
+            probabilities=probs,
+            confidence=conf,
+            latency_ms=latency,
+            source=source,
+            input_tokens=tokens,
+            instructions=ask.instructions,
+            labels=ask.labels,
+            sampled=sampled,
         )

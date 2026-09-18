@@ -19,7 +19,9 @@ from tests.conftest import FakeJev
 
 @pytest.fixture
 async def plugin_server(tmp_path):
-    srv = PluginServer(Config(plugin_port=0, log_dir=str(tmp_path)), Decider(FakeJev(), TH), RunLog(tmp_path), Hub(maxsize=4), Stats())
+    srv = PluginServer(
+        Config(plugin_port=0, log_dir=str(tmp_path)), Decider(FakeJev(), TH), RunLog(tmp_path), Hub(maxsize=4), Stats()
+    )
     await srv.start()
     yield srv
     await srv.stop()
@@ -47,8 +49,16 @@ async def test_ws_snapshot_then_decision(client, plugin_server):
     ws = await client.ws_connect("/ws")
     snap = json.loads((await ws.receive()).data)
     assert snap["type"] == "snapshot" and "stats" in snap and "decisions" in snap
-    d = Decision(kind="direction", choice="north", index=0, probabilities={"north": 1.0}, confidence=0.4,
-                 latency_ms=90.0, source="jev", input_tokens=50)
+    d = Decision(
+        kind="direction",
+        choice="north",
+        index=0,
+        probabilities={"north": 1.0},
+        confidence=0.4,
+        latency_ms=90.0,
+        source="jev",
+        input_tokens=50,
+    )
     plugin_server._record_decision(d, digest={}, entities={})
     got = json.loads((await ws.receive()).data)
     assert got["type"] == "decision" and got["choice"] == "north"
@@ -59,7 +69,7 @@ async def test_ws_control_forwards_to_plugin(client, plugin_server):
     reader, writer = await asyncio.open_connection("127.0.0.1", plugin_server.port)
     await asyncio.sleep(0.05)
     ws = await client.ws_connect("/ws")
-    await ws.receive()   # snapshot
+    await ws.receive()  # snapshot
     await ws.send_str(json.dumps({"type": "control", "automation": False}))
     line = json.loads(await asyncio.wait_for(reader.readline(), 2))
     assert line == {"type": "control", "automation": False}
@@ -70,7 +80,7 @@ async def test_ws_control_forwards_to_plugin(client, plugin_server):
 async def test_slow_ws_client_is_dropped_without_blocking(client, plugin_server):
     ws = await client.ws_connect("/ws")
     await ws.receive()
-    for i in range(20):   # hub maxsize is 4; the client never reads
+    for i in range(20):  # hub maxsize is 4; the client never reads
         plugin_server.hub.publish({"type": "stats", "n": i})
     await asyncio.sleep(0.1)
     assert plugin_server.hub.client_count == 0
@@ -82,7 +92,7 @@ async def test_ws_ignores_non_object_json(client, plugin_server):
     reader, writer = await asyncio.open_connection("127.0.0.1", plugin_server.port)
     await asyncio.sleep(0.05)
     ws = await client.ws_connect("/ws")
-    await ws.receive()   # snapshot
+    await ws.receive()  # snapshot
     await ws.send_str("42")
     await ws.send_str("[1, 2]")
     await ws.send_str(json.dumps({"type": "control", "automation": False}))
@@ -103,7 +113,9 @@ async def test_ws_rejects_foreign_origin_but_allows_own_host(client, plugin_serv
 
 
 async def test_snapshot_includes_run_history(client, plugin_server):
-    plugin_server.run_history.append({"character": "IMELDA", "stage": "FOREST", "seconds": 90, "level": 4, "jev_calls": 3, "fallback_calls": 0})
+    plugin_server.run_history.append(
+        {"character": "IMELDA", "stage": "FOREST", "seconds": 90, "level": 4, "jev_calls": 3, "fallback_calls": 0}
+    )
     ws = await client.ws_connect("/ws")
     snap = json.loads((await ws.receive()).data)
     assert snap["runs"][0]["character"] == "IMELDA"

@@ -1,4 +1,5 @@
 """Runtime configuration loaded from config.toml. Thresholds live in questions.py."""
+
 from __future__ import annotations
 
 import tomllib

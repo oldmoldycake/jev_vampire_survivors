@@ -4,8 +4,16 @@ import pytest
 def make_state(enemies=(), gems=(), pickups=(), hp=80, max_hp=100, level=5, minute=3):
     return {
         "player": {
-            "x": 0.0, "y": 0.0, "hp": hp, "max_hp": max_hp, "level": level, "xp": 10, "xp_to_next": 50,
-            "minute": minute, "seconds": minute * 60, "character": "ANTONIO",
+            "x": 0.0,
+            "y": 0.0,
+            "hp": hp,
+            "max_hp": max_hp,
+            "level": level,
+            "xp": 10,
+            "xp_to_next": 50,
+            "minute": minute,
+            "seconds": minute * 60,
+            "character": "ANTONIO",
             "weapons": [{"id": "WHIP", "level": 3, "max": False}],
             "passives": [{"id": "SPINACH", "level": 1, "max": False}],
         },

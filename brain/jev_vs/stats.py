@@ -1,4 +1,5 @@
 """Per-run counters shown in the dashboard header."""
+
 from __future__ import annotations
 
 import time
@@ -51,11 +52,16 @@ class Stats:
         elapsed_h = max(time.time() - self.run_started_at, 1e-6) / 3600.0
         cost = self.input_tokens / 1e6 * USD_PER_MILLION_INPUT_TOKENS
         return {
-            "calls": self.calls, "jev_calls": self.jev_calls, "fallback_calls": self.fallback_calls,
-            "reused": self.reused, "last_latency_ms": round(self.last_latency_ms, 1),
+            "calls": self.calls,
+            "jev_calls": self.jev_calls,
+            "fallback_calls": self.fallback_calls,
+            "reused": self.reused,
+            "last_latency_ms": round(self.last_latency_ms, 1),
             "avg_latency_ms": round(self._latency_sum / self.jev_calls, 1) if self.jev_calls else 0.0,
-            "input_tokens": self.input_tokens, "cost_usd": round(cost, 6),
+            "input_tokens": self.input_tokens,
+            "cost_usd": round(cost, 6),
             "cost_per_hour_usd": round(cost / elapsed_h, 4),
-            "plugin_connected": self.plugin_connected, "jev_ok": self.jev_ok,
+            "plugin_connected": self.plugin_connected,
+            "jev_ok": self.jev_ok,
             "run_started_at": self.run_started_at,
         }

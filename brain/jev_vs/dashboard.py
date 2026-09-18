@@ -1,4 +1,5 @@
 """Live dashboard: one static page plus a WebSocket fed by the Hub."""
+
 from __future__ import annotations
 
 import asyncio
@@ -39,17 +40,25 @@ def make_app(server: PluginServer) -> web.Application:
         ws = web.WebSocketResponse(heartbeat=20)
         await ws.prepare(request)
         q = server.hub.subscribe()
-        await ws.send_str(json.dumps({
-            "type": "snapshot", "stats": server.stats.snapshot(), "decisions": server.latest_decisions,
-            "log": server.recent_log, "run": server.current_run, "runs": server.run_history,
-        }))
+        await ws.send_str(
+            json.dumps(
+                {
+                    "type": "snapshot",
+                    "stats": server.stats.snapshot(),
+                    "decisions": server.latest_decisions,
+                    "log": server.recent_log,
+                    "run": server.current_run,
+                    "runs": server.run_history,
+                }
+            )
+        )
 
         async def pump() -> None:
             try:
                 while True:
                     msg = await q.get()
                     if not server.hub.is_subscribed(q):
-                        break   # dropped by the hub for falling behind
+                        break  # dropped by the hub for falling behind
                     await ws.send_str(json.dumps(msg))
             except (ConnectionResetError, RuntimeError):
                 pass

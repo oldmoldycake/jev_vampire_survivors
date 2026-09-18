@@ -1,4 +1,5 @@
 """JSONL run logs: runs/<YYYYMMDD-HHMMSS>/{ticks.jsonl,events.jsonl,summary.json}."""
+
 from __future__ import annotations
 
 import json
@@ -75,8 +76,13 @@ class RunLog:
         if not self.active:
             self._pending.clear()
             return {}
-        written = {**self._meta, **summary, "ended_at": time.time(),
-                   "ticks": self._tick_count, "events": self._event_count}
+        written = {
+            **self._meta,
+            **summary,
+            "ended_at": time.time(),
+            "ticks": self._tick_count,
+            "events": self._event_count,
+        }
         (self._run_dir / "summary.json").write_text(json.dumps(written, indent=2))
         self._ticks.close()
         self._events.close()

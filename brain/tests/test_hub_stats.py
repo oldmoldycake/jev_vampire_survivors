@@ -13,7 +13,7 @@ async def test_hub_fans_out_and_drops_full_clients():
     await fast.get()
     assert hub.publish({"n": 2}) == 0
     await fast.get()
-    dropped = hub.publish({"n": 3})   # slow now has 3 pending -> over maxsize 2
+    dropped = hub.publish({"n": 3})  # slow now has 3 pending -> over maxsize 2
     assert dropped == 1
     assert hub.client_count == 1
     assert (await fast.get()) == {"n": 3}
@@ -23,8 +23,16 @@ async def test_hub_fans_out_and_drops_full_clients():
 
 
 def _decision(source="jev", latency=100.0, tokens=1000):
-    return Decision(kind="direction", choice="north", index=0, probabilities={"north": 1.0},
-                    confidence=0.5, latency_ms=latency, source=source, input_tokens=tokens)
+    return Decision(
+        kind="direction",
+        choice="north",
+        index=0,
+        probabilities={"north": 1.0},
+        confidence=0.5,
+        latency_ms=latency,
+        source=source,
+        input_tokens=tokens,
+    )
 
 
 def test_stats_counts_and_cost():

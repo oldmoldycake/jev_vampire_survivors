@@ -1,4 +1,5 @@
 """Real API calls. Run with:  TYPESAFE_API_KEY=... uv run pytest -m live -v"""
+
 import json
 import os
 import time
@@ -19,7 +20,7 @@ def _states() -> list[dict]:
     runs = sorted(Path("runs").glob("*/ticks.jsonl"))
     if runs:
         lines = runs[-1].read_text().splitlines()[:8]
-        return [json.loads(l)["state"] for l in lines]
+        return [json.loads(line)["state"] for line in lines]
     return [
         make_state(enemies=[enemy(0, 0.3), enemy(0.2, 0.4), enemy(-0.1, 0.5)], gems=[gem(0, -1.5)], hp=30),
         make_state(gems=[gem(2, 0), gem(2.2, 0.1)], hp=95),
@@ -62,8 +63,24 @@ async def test_level_up_prefers_owned_weapon_over_random_new_item():
     dec = Decider(jev, DEFAULT_THRESHOLDS)
     try:
         opts = [
-            {"index": 0, "id": "SKULL_O_MANIAC", "name": "Skull O'Maniac", "kind": "passive", "level": 1, "is_new": True, "description": "Increases enemy speed, health, quantity and frequency."},
-            {"index": 1, "id": "WHIP", "name": "Whip", "kind": "weapon", "level": 4, "is_new": False, "description": "Attacks horizontally, passes through enemies. Fires one more projectile."},
+            {
+                "index": 0,
+                "id": "SKULL_O_MANIAC",
+                "name": "Skull O'Maniac",
+                "kind": "passive",
+                "level": 1,
+                "is_new": True,
+                "description": "Increases enemy speed, health, quantity and frequency.",
+            },
+            {
+                "index": 1,
+                "id": "WHIP",
+                "name": "Whip",
+                "kind": "weapon",
+                "level": 4,
+                "is_new": False,
+                "description": "Attacks horizontally, passes through enemies. Fires one more projectile.",
+            },
         ]
         d = await dec.pick("level_up", opts, {"weapons": ["WHIP L3"], "passives": [], "level": 4, "minute": 2})
         assert d.source == "jev" and d.choice == "WHIP"

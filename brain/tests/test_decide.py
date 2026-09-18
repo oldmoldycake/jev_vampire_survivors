@@ -54,20 +54,22 @@ def test_fallback_direction_stays_when_all_quiet():
 def test_fallback_direction_never_returns_a_blocked_sector():
     # west would otherwise be the obvious least-pressure pick (no enemies at all), but it's
     # blocked; north has only a light-pressure far enemy, every other sector has a touching one.
-    st = make_state(enemies=[
-        enemy(0, 3.9),      # north: far -> light pressure
-        enemy(0.21, 0.21),  # north_east: touching -> moderate pressure
-        enemy(0.3, 0),      # east
-        enemy(0.21, -0.21), # south_east
-        enemy(0, -0.3),     # south
-        enemy(-0.21, -0.21),# south_west
-        enemy(-0.21, 0.21), # north_west
-    ])
+    st = make_state(
+        enemies=[
+            enemy(0, 3.9),  # north: far -> light pressure
+            enemy(0.21, 0.21),  # north_east: touching -> moderate pressure
+            enemy(0.3, 0),  # east
+            enemy(0.21, -0.21),  # south_east
+            enemy(0, -0.3),  # south
+            enemy(-0.21, -0.21),  # south_west
+            enemy(-0.21, 0.21),  # north_west
+        ]
+    )
     st["player"]["applied_direction"] = "west"
     st["player"]["moved"] = 0.0
     d = digest_state(st, TH)
     assert d.sectors["west"].blocked is True
-    assert d.sectors["west"].pressure == "none"   # confirms it would otherwise win
+    assert d.sectors["west"].pressure == "none"  # confirms it would otherwise win
     assert decide.fallback_direction(d) == "north"
 
 
@@ -108,15 +110,17 @@ async def test_pick_with_no_options_raises():
 
 async def test_jev_client_constructs_without_api_key(monkeypatch):
     from jev_vs.jev_client import JevClient
+
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
-    client = JevClient(model="jev-latest", timeout_s=0.5, max_retries=0)   # must not raise
-    await client.aclose()                                                   # must not raise
+    client = JevClient(model="jev-latest", timeout_s=0.5, max_retries=0)  # must not raise
+    await client.aclose()  # must not raise
 
 
 async def test_real_jev_client_falls_back_end_to_end_without_api_key(monkeypatch):
     # Offline-safe: AsyncTypeSafeClient raises for a missing API key during construction,
     # before any network call is made, so Decider.direction still falls back cleanly.
     from jev_vs.jev_client import JevClient
+
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     dec = decide.Decider(JevClient(model="jev-latest", timeout_s=0.5, max_retries=0), TH)
     _, d = await dec.direction(make_state())
@@ -135,17 +139,17 @@ async def test_pick_character_samples_but_never_below_sample_floor():
     seen = set()
     for _ in range(300):
         decision = await dec.pick("character", opts)
-        assert decision.choice in {"A", "B", "C"}   # always a valid option
+        assert decision.choice in {"A", "B", "C"}  # always a valid option
         assert decision.source == "jev"
         assert decision.sampled is True
         seen.add(decision.choice)
-    assert "C" not in seen   # C's 1% probability is below SAMPLE_FLOOR (5%) and is never chosen
+    assert "C" not in seen  # C's 1% probability is below SAMPLE_FLOOR (5%) and is never chosen
     assert seen.issubset({"A", "B"})
 
 
 async def test_pick_character_keeps_jevs_top_answer_when_every_option_is_below_sample_floor():
     opts = [{"index": i, "id": f"OPT{i}", "name": f"Opt {i}"} for i in range(20)]
-    probs = {f"OPT{i}": 0.04 for i in range(20)}   # all below SAMPLE_FLOOR (0.05)
+    probs = {f"OPT{i}": 0.04 for i in range(20)}  # all below SAMPLE_FLOOR (0.05)
     fake = FakeJev(script={"character": ("OPT0", probs, 0.9)})
     dec = decide.Decider(fake, TH, rng=random.Random(7))
     decision = await dec.pick("character", opts)
@@ -174,7 +178,7 @@ async def test_reset_run_clears_block_memory():
     st["player"]["applied_direction"] = "north"
     st["player"]["moved"] = 0.0
     d, _ = await dec.direction(st)
-    assert d.sectors["north"].blocked is True   # remembered
+    assert d.sectors["north"].blocked is True  # remembered
 
     dec.reset_run()
 
@@ -182,7 +186,7 @@ async def test_reset_run_clears_block_memory():
     st2["player"]["applied_direction"] = "east"
     st2["player"]["moved"] = 1.0
     d2, _ = await dec.direction(st2)
-    assert d2.sectors["north"].blocked is False   # reset_run cleared the memory
+    assert d2.sectors["north"].blocked is False  # reset_run cleared the memory
 
 
 async def test_fallback_warnings_are_rate_limited(caplog):

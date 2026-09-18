@@ -15,9 +15,9 @@ def test_runlog_writes_jsonl_and_summary(tmp_path: Path):
     log.event({"event": "level_up", "index": 0})
     summary = log.end_run({"seconds": 42})
     assert log.active is False
-    ticks = [json.loads(l) for l in (run_dir / "ticks.jsonl").read_text().splitlines()]
+    ticks = [json.loads(line) for line in (run_dir / "ticks.jsonl").read_text().splitlines()]
     assert [t["id"] for t in ticks] == [1, 2]
-    events = [json.loads(l) for l in (run_dir / "events.jsonl").read_text().splitlines()]
+    events = [json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()]
     assert events[0]["event"] == "level_up"
     written = json.loads((run_dir / "summary.json").read_text())
     assert written["seconds"] == 42 and written["character"] == "ANTONIO" and written["ticks"] == 2
@@ -61,7 +61,7 @@ def test_buffered_record_keeps_its_arrival_time(tmp_path: Path):
     run_dir = log.start_run({})
     start_time = time.time()
     log.end_run({})
-    ticks = [json.loads(l) for l in (run_dir / "ticks.jsonl").read_text().splitlines()]
+    ticks = [json.loads(line) for line in (run_dir / "ticks.jsonl").read_text().splitlines()]
     assert len(ticks) == 1
     assert ticks[0]["t"] < start_time
     assert ticks[0]["t"] <= arrival + 0.05

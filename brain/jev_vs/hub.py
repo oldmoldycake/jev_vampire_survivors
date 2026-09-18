@@ -1,4 +1,5 @@
 """Fan-out of dashboard messages. A client that cannot keep up is dropped, never awaited."""
+
 from __future__ import annotations
 
 import asyncio

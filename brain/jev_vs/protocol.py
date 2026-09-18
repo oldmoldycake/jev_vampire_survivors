@@ -2,6 +2,7 @@
 
 One JSON object per line. Replies echo the request id. See spec section 4.
 """
+
 from __future__ import annotations
 
 import json
@@ -30,15 +31,28 @@ def move_reply(id: int, choice: str, probabilities: dict[str, float], confidence
 
     dx, dy = DIRECTION_VECTORS[choice]
     return {
-        "id": id, "type": "move", "dx": dx, "dy": dy, "choice": choice,
-        "probabilities": probabilities, "confidence": confidence, "source": source,
+        "id": id,
+        "type": "move",
+        "dx": dx,
+        "dy": dy,
+        "choice": choice,
+        "probabilities": probabilities,
+        "confidence": confidence,
+        "source": source,
     }
 
 
-def pick_reply(id: int, index: int, choice: str, probabilities: dict[str, float], confidence: float, source: str) -> dict:
+def pick_reply(
+    id: int, index: int, choice: str, probabilities: dict[str, float], confidence: float, source: str
+) -> dict:
     return {
-        "id": id, "type": "pick", "index": index, "choice": choice,
-        "probabilities": probabilities, "confidence": confidence, "source": source,
+        "id": id,
+        "type": "pick",
+        "index": index,
+        "choice": choice,
+        "probabilities": probabilities,
+        "confidence": confidence,
+        "source": source,
     }
 
 

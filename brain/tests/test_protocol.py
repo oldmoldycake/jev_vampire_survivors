@@ -50,8 +50,13 @@ def test_move_reply_diagonal_is_normalised():
 def test_pick_reply_carries_index():
     reply = protocol.pick_reply(9, 2, "SPINACH", {"SPINACH": 0.6, "WHIP": 0.4}, 0.3, "jev")
     assert reply == {
-        "id": 9, "type": "pick", "index": 2, "choice": "SPINACH",
-        "probabilities": {"SPINACH": 0.6, "WHIP": 0.4}, "confidence": 0.3, "source": "jev",
+        "id": 9,
+        "type": "pick",
+        "index": 2,
+        "choice": "SPINACH",
+        "probabilities": {"SPINACH": 0.6, "WHIP": 0.4},
+        "confidence": 0.3,
+        "source": "jev",
     }
 
 

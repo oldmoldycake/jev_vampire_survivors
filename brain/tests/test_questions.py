@@ -8,7 +8,14 @@ from tests.conftest import enemy, gem, make_state
 
 def test_directions_are_sectors_plus_stay():
     assert q.DIRECTIONS[:-1] == [
-        "north", "north_east", "east", "south_east", "south", "south_west", "west", "north_west",
+        "north",
+        "north_east",
+        "east",
+        "south_east",
+        "south",
+        "south_west",
+        "west",
+        "north_west",
     ]
     assert q.DIRECTIONS[-1] == "stay"
     assert set(q.DIRECTION_VECTORS) == set(q.DIRECTIONS)
@@ -43,23 +50,26 @@ def test_sector_text_leads_with_blocked():
     assert text.startswith("blocked, the survivor cannot get through that way")
 
 
-@pytest.mark.parametrize("kind,expected", [
-    ("TREASURE", "chest"),
-    ("STATS_TREASURE_2", "chest"),
-    ("COFFIN", "unlock"),
-    ("COFFINX", "unlock"),
-    ("MOONGATE", "relic"),
-    ("MERCHANT", "relic"),
-    ("RELIC_GOLD", "relic"),
-    ("ROAST", "healing"),
-    ("PURIFY2", "healing"),
-    ("VACUUM", "power"),
-    ("GILDED", "power"),
-    ("COIN", "coins"),
-    ("NFT", "coins"),
-    ("SOMETHING_UNKNOWN", "item"),
-    ("", "item"),
-])
+@pytest.mark.parametrize(
+    "kind,expected",
+    [
+        ("TREASURE", "chest"),
+        ("STATS_TREASURE_2", "chest"),
+        ("COFFIN", "unlock"),
+        ("COFFINX", "unlock"),
+        ("MOONGATE", "relic"),
+        ("MERCHANT", "relic"),
+        ("RELIC_GOLD", "relic"),
+        ("ROAST", "healing"),
+        ("PURIFY2", "healing"),
+        ("VACUUM", "power"),
+        ("GILDED", "power"),
+        ("COIN", "coins"),
+        ("NFT", "coins"),
+        ("SOMETHING_UNKNOWN", "item"),
+        ("", "item"),
+    ],
+)
 def test_pickup_category(kind, expected):
     assert q.pickup_category(kind) == expected
 
@@ -105,8 +115,24 @@ def test_direction_instructions_mention_shuffling():
 
 def test_options_question_keys_follow_option_order_and_are_unique():
     opts = [
-        {"index": 0, "id": "WHIP", "name": "Whip", "kind": "weapon", "level": 5, "is_new": False, "description": "Attacks horizontally."},
-        {"index": 1, "id": "SPINACH", "name": "Spinach", "kind": "passive", "level": 2, "is_new": False, "description": "Raises damage."},
+        {
+            "index": 0,
+            "id": "WHIP",
+            "name": "Whip",
+            "kind": "weapon",
+            "level": 5,
+            "is_new": False,
+            "description": "Attacks horizontally.",
+        },
+        {
+            "index": 1,
+            "id": "SPINACH",
+            "name": "Spinach",
+            "kind": "passive",
+            "level": 2,
+            "is_new": False,
+            "description": "Raises damage.",
+        },
         {"index": 2, "id": "WHIP", "name": "Whip", "kind": "weapon", "level": 5, "is_new": False, "description": "dup"},
     ]
     ask = q.options_question("level_up", opts, {"weapons": ["WHIP L4"], "passives": [], "level": 9, "minute": 6})
@@ -129,15 +155,27 @@ def test_options_question_normalises_dict_shaped_build_items():
 
 
 def test_options_question_mentions_evolution_and_new():
-    opts = [{"index": 0, "id": "KNIFE", "name": "Knife", "kind": "weapon", "level": 1, "is_new": True,
-             "description": "Fires quickly.", "evolution_ready": True}]
+    opts = [
+        {
+            "index": 0,
+            "id": "KNIFE",
+            "name": "Knife",
+            "kind": "weapon",
+            "level": 1,
+            "is_new": True,
+            "description": "Fires quickly.",
+            "evolution_ready": True,
+        }
+    ]
     ask = q.options_question("level_up", opts, None)
     desc = ask.question.criteria["KNIFE"]
     assert "new" in desc.lower() and "evolution" in desc.lower()
 
 
 def test_character_and_stage_questions():
-    chars = [{"id": "ANTONIO", "name": "Antonio Belpaese", "description": "Gains 10% damage.", "starting_weapon": "WHIP"}]
+    chars = [
+        {"id": "ANTONIO", "name": "Antonio Belpaese", "description": "Gains 10% damage.", "starting_weapon": "WHIP"}
+    ]
     ask = q.options_question("character", chars, None)
     assert ask.name == "character" and ask.keys == ["ANTONIO"]
     stages = [{"id": "FOREST", "name": "Mad Forest", "description": "The Castle is a lie."}]

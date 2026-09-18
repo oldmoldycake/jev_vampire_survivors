@@ -1,4 +1,5 @@
 """Thin wrapper over the TypeSafe SDK so the rest of the brain never sees SDK types."""
+
 from __future__ import annotations
 
 import time
@@ -36,7 +37,9 @@ class JevClient:
             self._client = AsyncTypeSafeClient(
                 api_key=self._api_key,
                 model=self._model,
-                retry=RetryPolicy(max_retries=self._max_retries, backoff_initial=0.05, backoff_max=0.2, timeout=self._timeout_s),
+                retry=RetryPolicy(
+                    max_retries=self._max_retries, backoff_initial=0.05, backoff_max=0.2, timeout=self._timeout_s
+                ),
                 timeout=self._timeout_s,
             )
 

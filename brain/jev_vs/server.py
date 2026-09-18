@@ -1,4 +1,5 @@
 """TCP server the game plugin connects to. One connection at a time is expected."""
+
 from __future__ import annotations
 
 import asyncio
@@ -15,8 +16,13 @@ from .stats import Stats
 
 log = logging.getLogger(__name__)
 
-PICK_EVENTS = {"character_select": "character", "stage_select": "stage", "level_up": "level_up",
-               "weapon_select": "weapon_select", "arcana_select": "arcana_select"}
+PICK_EVENTS = {
+    "character_select": "character",
+    "stage_select": "stage",
+    "level_up": "level_up",
+    "weapon_select": "weapon_select",
+    "arcana_select": "arcana_select",
+}
 RECENT_HISTORY_LIMIT = 5
 
 
@@ -158,22 +164,30 @@ class PluginServer:
         if self._in_flight:
             self.stats.mark_reused()
             last = self.last_direction
-            reply = protocol.move_reply(mid, last["choice"] if last else "stay",
-                                        last["probabilities"] if last else {"stay": 1.0},
-                                        last["confidence"] if last else 0.0, "reused")
+            reply = protocol.move_reply(
+                mid,
+                last["choice"] if last else "stay",
+                last["probabilities"] if last else {"stay": 1.0},
+                last["confidence"] if last else 0.0,
+                "reused",
+            )
             await self._reply(writer, reply)
             return
         self._in_flight = True
         try:
             state = msg.get("state", {})
             digest, decision = await self.decider.direction(state)
-            reply = protocol.move_reply(mid, decision.choice, decision.probabilities, decision.confidence, decision.source)
+            reply = protocol.move_reply(
+                mid, decision.choice, decision.probabilities, decision.confidence, decision.source
+            )
             self.last_direction = reply
             await self._reply(writer, reply)
             entities = {k: state.get(k, []) for k in ("enemies", "gems", "pickups")}
             entities["screen"] = state.get("screen", {})
             self._record_decision(decision, digest=digest.to_dict(), entities=entities, t=msg.get("t"))
-            self.runlog.tick({"id": mid, "t": msg.get("t"), "state": state, "digest": digest.to_dict(), **decision.to_dict()})
+            self.runlog.tick(
+                {"id": mid, "t": msg.get("t"), "state": state, "digest": digest.to_dict(), **decision.to_dict()}
+            )
         finally:
             self._in_flight = False
 
@@ -185,15 +199,24 @@ class PluginServer:
             summary = msg.get("summary", {})
             self.runlog.event({"id": mid, "event": event, "summary": summary})
             snap = self.stats.snapshot()  # spec section 9 run stats, taken before the run log closes
-            written = self.runlog.end_run({
-                **summary,
-                "jev_calls": snap["jev_calls"], "fallback_calls": snap["fallback_calls"], "reused": snap["reused"],
-                "avg_latency_ms": snap["avg_latency_ms"], "input_tokens": snap["input_tokens"], "cost_usd": snap["cost_usd"],
-            })
+            written = self.runlog.end_run(
+                {
+                    **summary,
+                    "jev_calls": snap["jev_calls"],
+                    "fallback_calls": snap["fallback_calls"],
+                    "reused": snap["reused"],
+                    "avg_latency_ms": snap["avg_latency_ms"],
+                    "input_tokens": snap["input_tokens"],
+                    "cost_usd": snap["cost_usd"],
+                }
+            )
             if written:  # a game_over with no active run must not add a row
                 self.run_history.append(written)
                 del self.run_history[:-50]
-            self._note(f"game over: {summary.get('character')} on {summary.get('stage')} survived {summary.get('seconds')}s level {summary.get('level')}")
+            self._note(
+                f"game over: {summary.get('character')} on {summary.get('stage')} "
+                f"survived {summary.get('seconds')}s level {summary.get('level')}"
+            )
             self.hub.publish({"type": "run", "phase": "end", "summary": written})
             self.current_run = {}
             return
@@ -218,8 +241,12 @@ class PluginServer:
         decision = await self.decider.pick(kind, options, msg.get("build"), recent=recent)
         chosen = options[decision.index]
         reply_index = chosen.get("index", decision.index)
-        await self._reply(writer, protocol.pick_reply(mid, reply_index, decision.choice, decision.probabilities,
-                                                      decision.confidence, decision.source))
+        await self._reply(
+            writer,
+            protocol.pick_reply(
+                mid, reply_index, decision.choice, decision.probabilities, decision.confidence, decision.source
+            ),
+        )
         if event == "character_select":
             self.current_run["character"] = chosen.get("id")
             self.runlog.update_meta(character=chosen.get("id"))
@@ -228,4 +255,7 @@ class PluginServer:
             self.runlog.update_meta(stage=chosen.get("id"))
         self._record_decision(decision, options=options)
         self.runlog.event({"id": mid, "event": event, "options": options, **decision.to_dict()})
-        self._note(f"{event}: picked {chosen.get('name', chosen.get('id'))} ({decision.source}, conf {decision.confidence:.2f})")
+        self._note(
+            f"{event}: picked {chosen.get('name', chosen.get('id'))} "
+            f"({decision.source}, conf {decision.confidence:.2f})"
+        )

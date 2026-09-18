@@ -1,8 +1,11 @@
 """Every Jev question the brain asks, and every threshold behind its wording.
 
 This is the file a human reviews. Nothing here does I/O. Jev is bad at
-numbers, so this module only ever hands it words (spec section 5).
+numbers, so this module hands it words for everything positional — sectors,
+distance/HP/XP buckets, enemy pressure. The only numerals it ever sees are
+equipment and option levels ("WHIP L3", "would reach level 4") (spec section 5).
 """
+
 from __future__ import annotations
 
 import math
@@ -17,6 +20,7 @@ if TYPE_CHECKING:  # digest imports Thresholds from here; keep the runtime impor
 
 # ----------------------------------------------------------------- thresholds
 
+
 @dataclass(frozen=True)
 class Thresholds:
     """Every numeric cut-off the brain uses to turn geometry into words.
@@ -24,6 +28,7 @@ class Thresholds:
     Distances are fractions of the visible half-height (screen.half_h).
     Pressure is a distance-weighted enemy count per sector.
     """
+
     touching: float = 0.15
     close: float = 0.4
     mid: float = 0.8
@@ -49,11 +54,25 @@ DEFAULT_THRESHOLDS = Thresholds()
 
 _D = 1 / math.sqrt(2)
 DIRECTIONS: list[str] = [
-    "north", "north_east", "east", "south_east", "south", "south_west", "west", "north_west", "stay",
+    "north",
+    "north_east",
+    "east",
+    "south_east",
+    "south",
+    "south_west",
+    "west",
+    "north_west",
+    "stay",
 ]
 DIRECTION_VECTORS: dict[str, tuple[float, float]] = {
-    "north": (0.0, 1.0), "north_east": (_D, _D), "east": (1.0, 0.0), "south_east": (_D, -_D),
-    "south": (0.0, -1.0), "south_west": (-_D, -_D), "west": (-1.0, 0.0), "north_west": (-_D, _D),
+    "north": (0.0, 1.0),
+    "north_east": (_D, _D),
+    "east": (1.0, 0.0),
+    "south_east": (_D, -_D),
+    "south": (0.0, -1.0),
+    "south_west": (-_D, -_D),
+    "west": (-1.0, 0.0),
+    "north_west": (-_D, _D),
     "stay": (0.0, 0.0),
 }
 
@@ -78,13 +97,36 @@ DIRECTION_INSTRUCTIONS = (
 
 # Pickup kind (as the game reports it) -> word category Jev is shown.
 PICKUP_CATEGORIES: dict[str, str] = {
-    "TREASURE": "chest", "STATS_TREASURE_1": "chest", "STATS_TREASURE_2": "chest", "STATS_TREASURE_3": "chest",
-    "COFFIN": "unlock", "COFFINX": "unlock", "COFFIN_EMPTY": "unlock",
-    "MOONGATE": "relic", "MERCHANT": "relic", "DIRECTER": "relic", "EGGMAN": "relic", "COSMO_PAVONE": "relic",
-    "ROAST": "healing", "ALWAYS_ROAST": "healing", "LITTLEHEART": "healing", "HEALER": "healing",
-    "PURIFY": "healing", "PURIFY2": "healing",
-    "VACUUM": "power", "ROSARY": "power", "ROSARYX": "power", "OROLOGION": "power", "CLOVER": "power", "GILDED": "power",
-    "COIN": "coins", "COINBAG1": "coins", "COINBAG2": "coins", "COINBAGMAX": "coins", "ALWAYS_COINBAG2": "coins", "NFT": "coins",
+    "TREASURE": "chest",
+    "STATS_TREASURE_1": "chest",
+    "STATS_TREASURE_2": "chest",
+    "STATS_TREASURE_3": "chest",
+    "COFFIN": "unlock",
+    "COFFINX": "unlock",
+    "COFFIN_EMPTY": "unlock",
+    "MOONGATE": "relic",
+    "MERCHANT": "relic",
+    "DIRECTER": "relic",
+    "EGGMAN": "relic",
+    "COSMO_PAVONE": "relic",
+    "ROAST": "healing",
+    "ALWAYS_ROAST": "healing",
+    "LITTLEHEART": "healing",
+    "HEALER": "healing",
+    "PURIFY": "healing",
+    "PURIFY2": "healing",
+    "VACUUM": "power",
+    "ROSARY": "power",
+    "ROSARYX": "power",
+    "OROLOGION": "power",
+    "CLOVER": "power",
+    "GILDED": "power",
+    "COIN": "coins",
+    "COINBAG1": "coins",
+    "COINBAG2": "coins",
+    "COINBAGMAX": "coins",
+    "ALWAYS_COINBAG2": "coins",
+    "NFT": "coins",
 }
 
 _OBJECT_TEXT: dict[str, str] = {
@@ -133,12 +175,13 @@ def sector_text(s: SectorSummary) -> str:
 @dataclass(frozen=True)
 class Ask:
     """One question ready for JevClient.ask plus the bookkeeping to apply its answer."""
+
     name: str
     state: dict
     question: Choice
-    keys: list[str]                 # criteria keys in option order
+    keys: list[str]  # criteria keys in option order
     instructions: str
-    labels: dict[str, str]          # key -> short human label for the dashboard
+    labels: dict[str, str]  # key -> short human label for the dashboard
 
 
 def direction_question(d: Digest) -> Ask:
