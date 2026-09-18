@@ -20,7 +20,7 @@ Or put `TYPESAFE_API_KEY=...` in a git-ignored `.env` at the repository root and
 cd brain && uv run jev-vs        # brain + dashboard at http://127.0.0.1:48232/
 ```
 
-Then launch Vampire Survivors from Steam and touch nothing: the plugin continues the warning and landing screens, picks a character and stage through Jev, and plays. Do not click into the game window while a run is going: the game pauses when it loses focus, and the plugin resumes it, so a click may register as a menu press. F9 in the game, or PAUSE on the dashboard, hands control back to you; press again to resume.
+Then launch Vampire Survivors from Steam and touch nothing: the plugin continues the warning and landing screens, picks a character and stage through Jev, and plays. Do not click into the game window while a run is going: the game pauses when it loses focus, and the plugin resumes it, so a click may register as a menu press. F9 in the game, or PAUSE on the dashboard, hands control back to you; press again to resume. Resuming automation takes effect in-run or at the next page; a menu that was open when you paused needs one press from you.
 
 Run logs land in `brain/runs/<timestamp>/` (`ticks.jsonl`, `events.jsonl`, `summary.json`).
 

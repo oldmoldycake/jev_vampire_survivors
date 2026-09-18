@@ -51,8 +51,20 @@ namespace JevSurvivors
         // ------------------------------------------------------------------ tracking
         public void PageShown(BaseUIPage page)
         {
+            _nudged.Remove(page);
+            PruneDeadPages();
             _shownAt[page] = Time.realtimeSinceStartup;
             Plugin.Log.LogInfo($"page shown: {page.GetType().Name}");
+        }
+
+        /// <summary>Drops _shownAt entries for pages Unity has already destroyed, so the dictionary can't grow with stale references.</summary>
+        private void PruneDeadPages()
+        {
+            List<BaseUIPage> dead = null;
+            foreach (var key in _shownAt.Keys)
+                if (key == null) (dead ??= new List<BaseUIPage>()).Add(key);
+            if (dead == null) return;
+            foreach (var key in dead) _shownAt.Remove(key);
         }
 
         public void PageHidden(BaseUIPage page)
@@ -198,7 +210,6 @@ namespace JevSurvivors
             page.SelectCharacter(false);
             yield return null;
             page.ConfirmCharacter();
-            RunsStarted++;
         }
 
         public void OnWeaponSelect(WeaponSelectionPage page) => _plugin.StartCoroutine(WeaponSelect(page));
@@ -272,12 +283,31 @@ namespace JevSurvivors
             yield return null;
             page.SelectStage();
             yield return null;
+            page._HyperModeTickBox?.InitialSet(false);
+            page._HurryModeTickBox?.InitialSet(false);
+            page._MazzoModeTickBox?.InitialSet(false);
+            page._LimitBreakTickBox?.InitialSet(false);
+            page._InverseModeTickBox?.InitialSet(false);
+            page._EndlessModeTickBox?.InitialSet(false);
+            // ConfirmStage() only re-derives Config.SelectedHyper/Hurry/Mazzo from the tick boxes' IsOn
+            // state; SelectedLimitBreak/SelectedInverse/SelectedReapers are otherwise only written by the
+            // tick box's OnToggle callback, which InitialSet() does not fire (verified against decompiled
+            // TickBoxUI.InitialSet and StageSelectPage.ConfirmStage), so zero those Config fields directly too.
+            var cfg = page._playerOptions?.Config;
+            if (cfg != null)
+            {
+                cfg.SelectedLimitBreak = false;
+                cfg.SelectedInverse = false;
+                cfg.SelectedReapers = false;
+            }
+            Plugin.Log.LogInfo("stage select: modifiers forced off");
             page.ConfirmStage();
         }
 
         public void OnRunStarted(MainGamePage page)
         {
             Movement.Clear();
+            RunsStarted++;   // counts an actual run start, not just a character confirm that might not reach gameplay
             var gm = GM.Core;
             Plugin.Log.LogInfo($"run started: {gm?.Player?.CharacterType} on {gm?.PlayerOptions?.Config?.SelectedStage}");
         }
@@ -301,10 +331,15 @@ namespace JevSurvivors
                 string kind = ui._isLimitBreak ? "limit_break" : ui.IsWeapon() ? "weapon" : ui.IsPowerUp() ? "passive" : "item";
                 string name = ui._data?.name ?? ui._itemData?.name ?? id;
                 string desc = ui._levelData?.description ?? ui._data?.description ?? ui._itemData?.description ?? "";
+                // LevelUpItemUI._currentLevel is never assigned by the game (verified in decompiled
+                // LevelUpItemUI.cs), so read the level from the WeaponData the option actually carries.
+                int level = ui._isLimitBreak ? ui._data?.level ?? 1
+                    : ui._type == WeaponType.VOID ? 1
+                    : ui._levelData?.level ?? ui._data?.level ?? 1;
                 options.Add(new JObject
                 {
                     ["index"] = items.Count - 1, ["id"] = id, ["name"] = name, ["kind"] = kind,
-                    ["level"] = ui._currentLevel, ["is_new"] = ui.IsNew(), ["description"] = desc,
+                    ["level"] = level, ["is_new"] = ui.IsNew(), ["description"] = desc,
                     ["evolution_ready"] = EvolutionReady(ui, owned),
                 });
             }
@@ -475,9 +510,19 @@ namespace JevSurvivors
         private IEnumerator GameOver(GameOverPage page)
         {
             Movement.Clear();
+            yield return new WaitForSecondsRealtime(2f);   // GameOverPage computes _stageComplete in OnIntroEnded ~1 s after showing
+            if (page != null && page.gameObject.activeInHierarchy && page._hasRevives && CanAutomate())
+            {
+                // GameOverPage.OnShowStart sets _hasRevives = GM.Core.HasAPlayerGotRevivals() before this
+                // coroutine can observe the page; Revive() has no other precondition (it just iterates
+                // GM.Core.AllPlayers, spends a revival on each one that has PRevivals() >= 1, and plays the
+                // revive animation), so calling it directly is safe (verified in decompiled GameOverPage.cs).
+                Plugin.Log.LogInfo("game over: reviving");
+                page.Revive();
+                yield break;
+            }
             RunsFinished++;
             // Telemetry below is deliberately not gated by automation: a run that ended is counted and reported either way.
-            yield return new WaitForSecondsRealtime(2f);   // GameOverPage computes _stageComplete in OnIntroEnded ~1 s after showing
             var gm = GM.Core;
             var p = gm?.Player;
             var summary = new JObject

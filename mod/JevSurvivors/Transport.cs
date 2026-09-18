@@ -13,7 +13,11 @@ namespace JevSurvivors
 {
     /// <summary>
     /// Newline-delimited JSON over TCP on a background thread. The main thread only touches
-    /// Send/Request/Pump. Replies are matched to requests by id; late replies are dropped.
+    /// Send/Request/Pump. Replies are matched to requests by id; a reply that arrives after its
+    /// request already timed out has no pending entry left to match, so it is not dropped but
+    /// forwarded on the unsolicited path instead - for a late `move` reply that means
+    /// Plugin.OnUnsolicited routes it to Movement.Apply, since stale brain knowledge is still
+    /// the freshest movement info available.
     /// </summary>
     public sealed class Transport
     {
@@ -34,6 +38,7 @@ namespace JevSurvivors
         private volatile bool _running;
         private volatile bool _connected;
         private long _nextId;
+        private bool _loggedDownSinceConnect;
 
         public bool Connected => _connected;
 
@@ -117,6 +122,7 @@ namespace JevSurvivors
                     client.Connect(_host, _port);
                     while (_outbox.TryDequeue(out _)) { }   // drop anything queued while disconnected
                     _connected = true;
+                    _loggedDownSinceConnect = false;
                     Plugin.Log.LogInfo($"connected to brain at {_host}:{_port}");
                     using (var stream = client.GetStream())
                     using (var reader = new StreamReader(stream, new UTF8Encoding(false)))
@@ -134,7 +140,21 @@ namespace JevSurvivors
                 }
                 catch (Exception e)
                 {
-                    if (_running) Plugin.Log.LogWarning($"brain link down: {e.Message}");
+                    if (_running)
+                    {
+                        // First failure since the last successful connection (or the first ever) is worth a
+                        // human's attention; repeats of the same "no brain yet" condition would just spam
+                        // the log every 2 s until the brain comes back, so those go to Debug instead.
+                        if (!_loggedDownSinceConnect)
+                        {
+                            Plugin.Log.LogWarning($"brain link down: {e.Message}");
+                            _loggedDownSinceConnect = true;
+                        }
+                        else
+                        {
+                            Plugin.Log.LogDebug($"brain link down: {e.Message}");
+                        }
+                    }
                 }
                 finally
                 {

@@ -162,10 +162,10 @@ Responsibilities:
 
 - **Transport**: background thread owning the TCP connection, reconnecting on failure. Outgoing messages are queued from the Unity main thread; incoming replies are stored and consumed on the main thread. No Unity API is touched off the main thread.
 - **Tick sampler**: a MonoBehaviour that every `1 / tick_hz` seconds, while a run is active and automation is on, builds the tick state from `GM.Core`, its `Stage`, and the player `CharacterController`, and sends it.
-- **Movement**: a Harmony postfix on the player controller's per-frame input read overwrites `_currentDirectionRaw` and `_currentDirection` with the latest `move` vector while automation is on. The exact method is confirmed by decompilation in the first implementation task.
-- **Menu driver**: Harmony postfixes on `Start` of `LandingScreenPage` and on `OnShowStart` of `WarningPage`, `MainMenuPage`, `CharacterSelectionPage`, `WeaponSelectionPage`, `StageSelectPage`, `ArcanaMainSelectionPage`, `LevelUpPage` (after its intro animation completes), `OpenTreasurePage`, `ItemFoundPage`, `CharacterFoundPage`, `GameOverPage`, `RecapPage`, `PausePage`, and `MainGamePage`. Each waits a short configurable delay for the page to finish populating, gathers its options, sends the event, and applies the reply through the page's own methods (`ForceSelectCharacter` and `ConfirmCharacter`, `SelectStage` and `ConfirmStage`, the level-up item's `Select`, `Quit`, or the page's default confirm).
+- **Movement**: a Harmony prefix on `CharacterController.ProcessRawDirection` overwrites `_currentDirectionRaw` with the latest `move` vector while automation is on. The exact method is confirmed by decompilation in the first implementation task.
+- **Menu driver**: Harmony postfixes on `Start` of `LandingScreenPage` and on `OnShowStart` of `WarningPage`, `MainMenuPage`, `CharacterSelectionPage`, `WeaponSelectionPage`, `StageSelectPage`, `ArcanaMainSelectionPage`, `LevelUpPage` (after its intro animation completes), `OpenTreasurePage`, `ItemFoundPage`, `CharacterFoundPage`, `GameOverPage`, `RecapPage`, `PausePage`, and `MainGamePage` (`MainGamePage` and `OpenTreasurePage` are dispatched from the base-page postfix). Each waits a short configurable delay for the page to finish populating, gathers its options, sends the event, and applies the reply through the page's own methods (`ForceSelectCharacter` and `ConfirmCharacter`, `SelectStage` and `ConfirmStage`, the level-up item's `Select`, `Quit`, or the page's default confirm).
 - **Safety net**: any `BaseUIPage` subclass without a specific handler that stays open longer than `unknown_page_timeout_s` (default 10) gets its default confirm invoked, and the incident is logged.
-- **Kill switch**: F9 or a `control` message from the brain toggles automation. When off, movement and menu hooks do nothing and the human plays; ticks are still sent so the brain keeps logging and the dashboard keeps drawing.
+- **Kill switch**: F9 or a `control` message from the brain toggles automation. When off, movement and menu hooks do nothing and the human plays; ticks stop while automation is off, so no Jev calls are spent while a human plays; the dashboard keeps its last state.
 - **Config** (`BepInEx/config/dev.oldmoldycake.jevsurvivors.cfg`): host, port, tick_hz, reply timeouts, max_entities, hotkey, autoplay_on_boot, max_runs (0 = unlimited), pause_between_runs_s.
 
 ## 7. Run loop
@@ -175,7 +175,7 @@ Responsibilities:
 3. Character select shows. Plugin sends the unlocked list, applies the pick, confirms. If a weapon selection page appears, the plugin sends a `weapon_select` event, which the brain answers with the level-up question.
 4. Stage select shows. Plugin sends available stages, applies the pick, confirms with default modifiers (no hyper, hurry, inverse, or endless).
 5. Run starts. Ticks flow; movement follows Jev. Level-up and arcana pages are answered. Treasure and unlock pages are dismissed. The pause page (the game pauses when its window loses focus) is resumed while automation is on.
-6. Game over shows. Plugin sends the summary, quits to the recap, confirms, and returns to the main menu.
+6. Game over shows. Plugin sends the summary, quits to the recap, confirms, and returns to the main menu. If the game offers a revive, the plugin revives instead and the run continues.
 7. After `pause_between_runs_s`, step 2 repeats until `max_runs` is reached.
 
 ## 8. Failure handling
@@ -252,22 +252,22 @@ jev_vampire_survivors/
       dashboard.py       aiohttp app, WebSocket broadcast, stats
       static/index.html  the dashboard page (inline CSS and JS)
     tests/
+    runs/                git-ignored run logs
     config.toml
   mod/                   C# BepInEx plugin
-    JevSurvivors/        .csproj, Plugin.cs, Transport.cs, TickSampler.cs, Movement.cs, MenuDriver.cs, Config.cs
+    JevSurvivors/        .csproj, Plugin.cs, Transport.cs, StateSampler.cs, Movement.cs, MenuDriver.cs, Patches.cs
     Directory.Build.props  GameDir pointing at the Managed folder
   scripts/
     install_bepinex.sh   downloads and extracts BepInEx into the game folder
     deploy_mod.sh        builds and copies the plugin DLL
     decompile.sh         ilspycmd VampireSurvivors.Runtime.dll into decompiled/ (git-ignored)
     fake_plugin.py       replays a run log to the brain
-  runs/                  git-ignored run logs
   docs/superpowers/specs/, docs/superpowers/plans/
 ```
 
 Prerequisites the user installs or sets:
 
-- `sudo pacman -S dotnet-sdk` (builds the plugin and runs `dotnet tool install -g ilspycmd`).
+- `curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 8.0` (installs to `~/.dotnet`; builds the plugin and runs `dotnet tool install -g ilspycmd`).
 - BepInEx 5.4.23.5 Linux x64 in the game folder and the Steam launch option above (scripted where possible).
 - `TYPESAFE_API_KEY` exported in the shell that runs the brain.
 - `uv` is already installed; Python 3.14 is present.

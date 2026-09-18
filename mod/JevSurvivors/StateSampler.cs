@@ -43,7 +43,8 @@ namespace JevSurvivors
             var p = gm.Player;
             var stage = gm.Stage;
             Vector3 pp = p.transform.position;
-            Bounds b = stage._mainCamera.OrthographicBounds();
+            Camera cam = stage._mainCamera != null ? stage._mainCamera : Camera.main;
+            Bounds b = cam.OrthographicBounds();
             int cap = Plugin.MaxEntities.Value;
 
             var enemies = new List<(float d, float dx, float dy, EnemyController e)>();

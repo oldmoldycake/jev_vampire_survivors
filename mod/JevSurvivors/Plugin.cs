@@ -36,6 +36,7 @@ namespace JevSurvivors
         internal MenuDriver Menu { get; private set; }
 
         private Harmony _harmony;
+        private string _cachedHello;
 
         private void Awake()
         {
@@ -56,7 +57,8 @@ namespace JevSurvivors
             ToggleKey = Config.Bind("Hotkeys", "ToggleKey", KeyCode.F9, "Toggle automation on and off");
 
             Automation = AutoplayOnBoot.Value;
-            Transport = new Transport(Host.Value, Port.Value, HelloJson);
+            _cachedHello = BuildHelloJson();   // computed once here, on the main thread: Application.version must never be read from the transport thread
+            Transport = new Transport(Host.Value, Port.Value, () => _cachedHello);
             Transport.Start();
             Sampler = new StateSampler(Transport);
             Menu = new MenuDriver(this, Transport);
@@ -74,7 +76,7 @@ namespace JevSurvivors
             Movement.Expire();
         }
 
-        private static string HelloJson()
+        private static string BuildHelloJson()
         {
             return new JObject
             {
