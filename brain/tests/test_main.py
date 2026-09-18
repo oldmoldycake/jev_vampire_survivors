@@ -16,3 +16,9 @@ async def test_build_wires_server_and_app(tmp_path):
     assert srv.config.plugin_port == 0
     routes = {r.resource.canonical for r in app.router.routes()}
     assert "/" in routes and "/ws" in routes
+    assert srv.decider.jev is not None
+
+    from tests.conftest import FakeJev
+    fake = FakeJev()
+    srv2, _ = build(Config(plugin_port=0, log_dir=str(tmp_path)), jev=fake)
+    assert srv2.decider.jev is fake

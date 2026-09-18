@@ -58,6 +58,11 @@ class Decider:
         self._jev = jev
         self._th = thresholds
 
+    @property
+    def jev(self):
+        """The Jev client this decider asks; exposed so the process can close it at shutdown."""
+        return self._jev
+
     async def _ask(self, ask: Ask) -> tuple[str | None, dict, float, float, int]:
         """Returns (choice or None on failure, probabilities, confidence, latency_ms, tokens)."""
         try:

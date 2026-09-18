@@ -53,6 +53,7 @@ async def run(config: Config) -> None:
     log.info("shutting down")
     await server.stop()
     await runner.cleanup()
+    await server.decider.jev.aclose()
 
 
 def main(argv: list[str] | None = None) -> int:
