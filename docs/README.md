@@ -30,6 +30,10 @@ Three things to keep in mind while reading them:
   API and about the decompiled game assembly (class, field and method names the plugin hooks),
   with the evidence for each. That section is the thing to re-check first if a game update
   breaks the plugin.
+- [`2026-09-18-windows-support-and-pinned-picks-design.md`](superpowers/specs/2026-09-18-windows-support-and-pinned-picks-design.md)
+  — two independent features planned together: Part A, pinning a character or stage from the
+  dashboard instead of asking Jev, which shipped; and Part B, a Windows/IL2CPP port, which did
+  not — see the plans below for how each turned out.
 
 ## `superpowers/plans/` — the task breakdown
 
@@ -40,6 +44,21 @@ Three things to keep in mind while reading them:
   BepInEx plugin, likewise: scaffold and config, the TCP transport, tick sampling and movement,
   the menu driver, and the run loop. Each task names the files it touches and how it was to be
   verified.
+- [`2026-09-18-pinned-character-and-stage.md`](superpowers/plans/2026-09-18-pinned-character-and-stage.md)
+  — Part A of the design above: the `PinStore`, the dashboard pin controls, and how a pinned
+  pick flows through `server.py` and `Decider` unchanged downstream. Shipped.
+- [`2026-09-18-windows-phase-0-spike.md`](superpowers/plans/2026-09-18-windows-phase-0-spike.md)
+  — Part B's throwaway feasibility spike: whether an IL2CPP port is even verifiable on this
+  machine, five exit criteria, evidence rather than code. All five passed; nothing here was kept.
+- [`2026-09-18-linux-install-recovery.md`](superpowers/plans/2026-09-18-linux-install-recovery.md)
+  — a Phase 0 step accidentally overwrote the working Linux Mono install with the Windows IL2CPP
+  build. This is the recovery plan plus the wrong-flavour guard added so the mistake fails loud
+  instead of silent next time.
+
+The Windows/IL2CPP port itself (Part B, past the spike) was built far enough to load, connect to
+the brain and take Harmony patches under Proton, then stopped on two unresolved blockers. It was
+never merged and isn't part of this history — its commits live on the unmerged
+`feat/il2cpp-plugin` branch for anyone who wants to pick it back up.
 
 ## `superpowers/ledgers/` — what actually happened
 
