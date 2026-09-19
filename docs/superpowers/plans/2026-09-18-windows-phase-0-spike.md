@@ -253,24 +253,80 @@ agent work that the "write the plan and stop" instruction covers.
 
 ## §6 Findings report (the deliverable)
 
-```markdown
-# Windows Phase 0 spike: findings (YYYY-MM-DD)
+**Run 2026-09-18, 23:20-23:30. All five criteria answered. No criterion failed.**
 
 | Criterion | Result | Evidence |
 | --- | --- | --- |
-| 1. Separate Windows copy exists | pass / fail | `file` output, path, size |
-| 2. Boots under Proton to main menu | pass / fail | which Proton, what was seen |
-| 3. BepInEx 6 IL2CPP loads | pass / fail | build string pinned, log excerpt, interop listing |
-| 4. Hello-world BasePlugin loads | pass / fail | log line |
-| 5. Members survive interop | see table | per-member table above |
+| 1. Separate Windows copy exists | **pass** | `~/games/vs-windows/VampireSurvivors.exe` is `PE32+ executable (GUI), x86-64`; `GameAssembly.dll` 182M, `global-metadata.dat` 51M, no `VampireSurvivors_Data/Managed/`; 1.2G, outside every Steam library |
+| 2. Boots under Proton | **pass** | ran as a non-Steam shortcut under Proton Experimental; human-confirmed |
+| 3. BepInEx 6 IL2CPP loads | **pass, but only on a bleeding-edge build** | `BepInEx 6.0.0-be.788`, `System platform: Windows 10 (Wine 11.0) 64-bit`, `Runtime version: 6.0.7`, 202 interop assemblies generated into `BepInEx/interop/` |
+| 4. Hello-world `BasePlugin` loads | **pass** | `Loading [JevHello 0.1.0]` -> `JEVHELLO: BasePlugin.Load reached`, `runtime=6.0.7, os=Microsoft Windows NT 10.0.19045.0`, `Chainloader startup complete`, zero errors |
+| 5. Hooked members survive interop | **pass, all five** | see the table below |
 
-**Namespace pin:** BepInEx.IL2CPP | BepInEx.Unity.IL2CPP (from the build in criterion 3)
+### Criterion 3's real finding: a tagged release cannot work
 
-**Structure decision:** shared source + aliases | two sibling projects
-**Because:** <fraction of shared lines needing #if IL2CPP, from the criterion 5 table>
+The game is **Unity 6000.0.62f1**, whose IL2CPP metadata is **version 31**. BepInEx's current tagged
+release (`v6.0.0-pre.2`, which reports internally as `be.697`) bundles a Cpp2IL supporting metadata
+**23-29** and fails outright:
 
-**Stopped at:** <criterion, if any> — <what happened, verbatim>
+```
+Failed to generate Il2Cpp interop assemblies: LibCpp2ILInitializationException
+System.FormatException: Unsupported metadata version found! We support 23-29, got 31
 ```
 
-Phases 1-3 get their plan only once this report exists. Spec §6: "Part B's plan cannot be written
-past Phase 0 in any detail until the spike reports."
+`BepInEx 6.0.0-be.788` from builds.bepinex.dev bundles a Cpp2IL supporting **23-106** and generates
+all 202 interop assemblies. The same failure would hit any Windows user following a README that
+said "install BepInEx 6", so the build must be pinned to a bleeding-edge artifact and said plainly.
+
+- Pinned artifact: `BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.788+5b766a3.zip`
+- sha256 `f4cc496bd098a0df4164b81e3737297707f13a47c2478dba2f60eefab784817a`
+- Launch option that makes the doorstop load under Proton: `WINEDLLOVERRIDES="winhttp=n,b" %command%`
+
+**Namespace pin:** `BepInEx.Unity.IL2CPP` (not pre.1's `BepInEx.IL2CPP`). Confirmed from the shipped
+`BepInEx.Unity.IL2CPP.xml`: `M:BepInEx.Unity.IL2CPP.BasePlugin.AddComponent``1` and
+`M:BepInEx.Unity.IL2CPP.IL2CPPChainloader.AddUnityComponent``1`. The bundled runtime is .NET
+**6.0.7**, so `net6.0` is the right `TargetFramework`, as spec §4.4 assumed.
+
+### Criterion 5: the member survey
+
+| Member | Present | Shape under interop |
+| --- | --- | --- |
+| `CharacterSelectionPage._characterItemUIs` | yes | property `_characterItemUIs` (`get__`/`set__` accessors + `NativeFieldInfoPtr__`) |
+| `StageSelectPage._spawned` | yes | same shape |
+| `LevelUpPage._spawnedItems` | yes | same shape |
+| `CharacterController._currentDirectionRaw` | yes | same shape |
+| `Stage.GetAllEnemiesInScreenBounds` | yes | method, name unchanged |
+
+All five live in `VampireSurvivors.Runtime.dll` — the same assembly name as the Mono build. Il2CppInterop
+turns each private field into a **property of the same name**, so `page._characterItemUIs` is valid C#
+against both runtimes: a publicized field on Mono, a property on IL2CPP. The five hooks need no alias
+and no `#if` at all.
+
+Namespaces are identical between the two builds (`VampireSurvivors.*`, unprefixed in both), and the
+`UnityEngine.*Module.dll` assemblies keep their names. The only assembly that is renamed is
+`mscorlib.dll` -> `Il2Cppmscorlib.dll`.
+
+### Structure decision: shared source + aliases (spec §4.2's primary option)
+
+**Not** the two-sibling-projects fallback. The criterion recorded in advance was "if more than roughly a
+quarter of the shared lines need fencing, take the fallback". Measured divergence is far below that:
+
+1. the entry point (`BaseUnityPlugin`+`Awake` vs `BasePlugin`+`Load`) — one file per project, already
+   planned as such in spec §4.4;
+2. BCL types in game signatures coming from `Il2Cppmscorlib` (`Il2CppSystem.*`) — what the
+   `global using` alias files exist to absorb;
+3. coroutine starts and type injection — the `#if IL2CPP` blocks spec §4.4 already budgets for;
+4. `Newtonsoft.Json` from NuGet instead of the game's copy, as spec §2 predicted.
+
+`Patches.cs` was flagged in spec §4.7 as the file most exposed to Harmony-on-IL2CPP problems. Criterion 5
+gives it no early warning: every member it needs survived, and `Il2CppInterop.HarmonySupport.dll` ships in
+the pinned build. That risk stays open until Phase 2 actually patches something.
+
+### What this does NOT establish
+
+- Nothing was verified on real Windows hardware. Everything above is "verified under Proton on Linux",
+  per spec §4.6, and README must say exactly that.
+- The game was launched to the point where BepInEx loaded and a plugin ran. A full run under the real
+  plugin — menus driven, a stage played, game over — has not happened on the IL2CPP side.
+- Harmony patching of game methods under IL2CPP is untested.
+
