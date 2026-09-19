@@ -14,8 +14,8 @@ if [ -d "$GAME_DIR/VampireSurvivors_Data" ] && [ ! -d "$GAME_DIR/VampireSurvivor
   if [ -d "$GAME_DIR/VampireSurvivors_Data/il2cpp_data" ]; then
     echo "This looks like the Windows IL2CPP build. BepInEx 5 Linux cannot load it." >&2
   fi
-  echo "Restore the Linux build first:" >&2
-  echo "  Steam -> Vampire Survivors -> Properties -> Installed Files -> Verify integrity of game files" >&2
+  echo "Restore the Linux build:" >&2
+  echo "  If this is your Steam install: Vampire Survivors -> Properties -> Installed Files -> Verify integrity of game files" >&2
   exit 1
 fi
 PINNED_VER="5.4.23.5"

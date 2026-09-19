@@ -109,13 +109,19 @@ file ~/.local/share/Steam/steamapps/common/"Vampire Survivors"/VampireSurvivors.
 Expected: `target ok: /home/<you>/games/vs-windows`, and the Steam install reporting `ELF 64-bit`.
 A `REFUSING:` line means stop and choose a different target.
 
+If that `file` command reports `PE32+` instead of `ELF 64-bit`, the Linux install is currently
+overwritten — restore it before running anything below, per
+`docs/superpowers/plans/2026-09-18-linux-install-recovery.md`.
+
 - [ ] **Download the Windows depot into that directory**
 
+Run this in the same shell as the preflight above, so `$T` is still set.
+
 ```bash
-mkdir -p ~/games/vs-windows
+mkdir -p "$T"
 steamcmd +@sSteamCmdForcePlatformType windows \
          +login <your-steam-account> \
-         +force_install_dir ~/games/vs-windows \
+         +force_install_dir "$T" \
          +app_update 1794680 validate \
          +quit
 ```

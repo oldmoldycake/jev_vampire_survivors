@@ -12,6 +12,12 @@ command -v dotnet >/dev/null || {
   exit 1
 }
 
+if [ ! -d "$GAME_DIR/VampireSurvivors_Data" ]; then
+  echo "$GAME_DIR does not look like a Vampire Survivors install: VampireSurvivors_Data is missing." >&2
+  echo "Point GAME_DIR at the game folder, or install the game first." >&2
+  exit 1
+fi
+
 # Both builds ship under the same folder name and steamcmd with a platform override will swap one
 # for the other in place. Absence of Managed/ is the reliable test: the Mono install also carries
 # the Windows IL2CPP payload (GameAssembly.dll, il2cpp_data), so those prove nothing on their own.
@@ -19,8 +25,8 @@ if [ ! -f "$GAME_DIR/VampireSurvivors_Data/Managed/VampireSurvivors.Runtime.dll"
   echo "$GAME_DIR does not hold the Linux Mono build." >&2
   echo "VampireSurvivors_Data/Managed/VampireSurvivors.Runtime.dll is missing, and this plugin is built against it." >&2
   if [ -d "$GAME_DIR/VampireSurvivors_Data/il2cpp_data" ] && [ ! -d "$GAME_DIR/VampireSurvivors_Data/Managed" ]; then
-    echo "This looks like the Windows IL2CPP build. Restore the Linux one:" >&2
-    echo "  Steam -> Vampire Survivors -> Properties -> Installed Files -> Verify integrity of game files" >&2
+    echo "This looks like the Windows IL2CPP build. Restore the Linux build:" >&2
+    echo "  If this is your Steam install: Vampire Survivors -> Properties -> Installed Files -> Verify integrity of game files" >&2
   fi
   exit 1
 fi

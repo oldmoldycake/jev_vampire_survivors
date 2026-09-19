@@ -40,12 +40,12 @@ except where marked **unverified**.
   **Most likely cause, not observed:** a steamcmd run with `+@sSteamCmdForcePlatformType windows`
   whose `force_install_dir` still pointed at the Steam library, which would rewrite only the
   differing files (the 672K exe) and prune the Mono-only directories, leaving the already-matching
-  Windows payload alone. The folder is being restored from Steam; see
+  Windows payload alone. Restoration is pending; see
   `docs/superpowers/plans/2026-09-18-linux-install-recovery.md`. The design conclusion the
   bullet supports still holds: both builds' files can coexist, and the IL2CPP inputs needed for
   interop generation are present without downloading a depot.
 - The Windows player is therefore IL2CPP, confirming what README's Platform support section claims.
-  The Windows `VampireSurvivors.exe` is not on disk — the ELF of the same name occupies it.
+  The Windows `VampireSurvivors.exe` is not on disk — the ELF of the same name occupies it. **Superseded 2026-09-18 22:00 — see the correction at the end of this group.**
 - `steam_appid.txt` is `1794680`.
 - Consequence: interop assemblies for the Windows build can be generated on this machine today,
   before any Windows depot is downloaded, because `GameAssembly.dll` and `global-metadata.dat` are
@@ -55,7 +55,7 @@ except where marked **unverified**.
 
 - Proton Experimental, 9.0, 10.0, 11.0 and Hotfix are installed under `steamapps/common`.
 - `steamcmd` is not installed. Downloading the Windows depot separately needs it (or an equivalent),
-  plus an interactive Steam login — **a human step; it cannot be automated from a coding session.**
+  plus an interactive Steam login — **a human step; it cannot be automated from a coding session.** **Superseded 2026-09-18 — steamcmd was installed from the AUR (it is not in the Arch repos) and the Windows depot now exists at `~/games/vs-windows`.**
 - **Unverified:** that the Windows build boots under Proton at all, that Steam API init succeeds
   outside the Steam client, and that BepInEx 6's `winhttp` doorstop loads under Proton. Phase 0
   exists to answer exactly these.
