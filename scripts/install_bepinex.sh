@@ -2,6 +2,22 @@
 # Installs BepInEx 5 (Linux x64) into the Vampire Survivors folder. Safe to re-run.
 set -euo pipefail
 GAME_DIR="${GAME_DIR:-$HOME/.local/share/Steam/steamapps/common/Vampire Survivors}"
+
+# This installs the Linux Mono flavour of BepInEx 5. Unpacking it into the Windows IL2CPP build
+# produces a game that loads nothing and a folder that is hard to untangle afterwards. The question
+# is "is a game here, and is it the wrong flavour", so VampireSurvivors_Data gates the check and
+# Managed/ answers it; il2cpp_data only sharpens the message, as in deploy_mod.sh. Testing the
+# directory rather than a specific assembly is deliberate: only the build's flavour matters here,
+# while deploy_mod.sh must confirm the exact file it compiles against.
+if [ -d "$GAME_DIR/VampireSurvivors_Data" ] && [ ! -d "$GAME_DIR/VampireSurvivors_Data/Managed" ]; then
+  echo "$GAME_DIR holds a game, but not the Linux Mono build: VampireSurvivors_Data/Managed is missing." >&2
+  if [ -d "$GAME_DIR/VampireSurvivors_Data/il2cpp_data" ]; then
+    echo "This looks like the Windows IL2CPP build. BepInEx 5 Linux cannot load it." >&2
+  fi
+  echo "Restore the Linux build:" >&2
+  echo "  If this is your Steam install: Vampire Survivors -> Properties -> Installed Files -> Verify integrity of game files" >&2
+  exit 1
+fi
 PINNED_VER="5.4.23.5"
 # sha256 of BepInEx_linux_x64_5.4.23.5.zip, as published by GitHub for that release asset.
 PINNED_SHA256="e538560be65739f562519ab518a75f9c65b3f57f87457403ae7cde683c12dab7"

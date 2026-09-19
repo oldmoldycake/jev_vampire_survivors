@@ -28,6 +28,12 @@ published to PyPI or to a mod portal.
 
 - A human-pinned pick is no longer counted as a Jev fallback in the dashboard's run stats,
   which would have reported an API problem that never happened.
+- `scripts/deploy_mod.sh` and `scripts/install_bepinex.sh` now check which build a game folder holds
+  before doing anything with it. Deploy refuses a folder without
+  `VampireSurvivors_Data/Managed/VampireSurvivors.Runtime.dll`, the assembly the plugin compiles
+  against; the installer refuses any folder that holds a game but no `Managed/` directory, the
+  Windows IL2CPP build among them. Each previously failed later and less clearly — an unresolvable
+  MSBuild reference, or a Mono loader unpacked into an IL2CPP install.
 
 ## [0.1.0] - 2026-09-18
 
