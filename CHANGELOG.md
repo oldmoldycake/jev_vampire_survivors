@@ -14,7 +14,20 @@ published to PyPI or to a mod portal.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Pin a character or a stage from the dashboard.** Two dropdowns beside the Pause button
+  override Jev's choice for the next run: the pinned pick is applied directly, costs no API
+  call, and is marked `human` in the run log and on the decision card. Leaving both on
+  "JEV DECIDES" is the default and keeps the previous behaviour exactly. Pins survive a brain
+  restart in `brain/pins.json`, and a pin the game does not offer that run falls back to Jev
+  with a note in the dashboard log rather than being silently dropped. No plugin change: the
+  game never learns a human was involved.
+
+### Fixed
+
+- A human-pinned pick is no longer counted as a Jev fallback in the dashboard's run stats,
+  which would have reported an API problem that never happened.
 
 ## [0.1.0] - 2026-09-18
 

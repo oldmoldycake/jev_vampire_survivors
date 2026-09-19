@@ -157,6 +157,11 @@ A few things worth knowing while it's running:
   immediately; press again to resume. Toggling automation off stops Jev calls (and their cost)
   until you turn it back on. If a menu was open when you paused, it needs one manual press from
   you before automation can pick up from there again.
+- **Pin a character or a stage** from the dashboard's CHARACTER and STAGE dropdowns and the brain
+  applies your choice instead of asking Jev, from the next menu onward — the run in progress is
+  not disturbed. Leave them on JEV DECIDES (the default) and nothing changes. A dropdown lists
+  what the game last offered, so it fills in the first time a menu opens; a pin the game does not
+  offer that run is kept, noted in the dashboard log, and that one pick goes back to Jev.
 - Run logs land in `brain/runs/<timestamp>/` (`ticks.jsonl`, `events.jsonl`, `summary.json`) —
   useful for later analysis or for replaying into the brain (see [Develop](#develop)).
 - Watch the cost. Jev calls are metered by TypeSafe; the dashboard header and each run's
@@ -168,7 +173,8 @@ A few things worth knowing while it's running:
 
 - **Questions and thresholds** (what Jev is asked, and the wording of every option): `brain/jev_vs/questions.py` — the only file this project's prompt wording lives in.
 - **Brain ports, model, timeouts:** `brain/config.toml`. The tick rate is *not* set here — the
-  plugin drives the cadence, so change `TickHz` in the plugin config below.
+  plugin drives the cadence, so change `TickHz` in the plugin config below. `state_file` names
+  where dashboard pins are remembered (`brain/pins.json` by default, git-ignored).
 - **Plugin timing, entity caps, run count, hotkey:** `<game>/BepInEx/config/dev.oldmoldycake.jevsurvivors.cfg` (named by the plugin's GUID, not by its display name — it won't appear as `JevSurvivors.cfg`). Key settings: `AutoplayOnBoot`, `MaxRuns` (0 = unlimited), `PauseBetweenRunsS`, `ToggleKey` (default `F9`), `TickHz`, `MaxEntities`.
 
 ## Develop
@@ -203,11 +209,13 @@ brain/                   Python package (uv), typesafe-sdk, pytest
     questions.py         all Jev questions and thresholds — the file to read/edit for tuning
     jev_client.py        TypeSafe SDK wrapper: retries, lazy construction, fallback marking
     decide.py            turns a Jev answer (or a failure) into an applied Decision
+    pins.py              human-pinned character/stage and the rosters behind the dropdowns
     runlog.py            JSONL run logs
     hub.py, dashboard.py aiohttp app + WebSocket broadcast for the live dashboard
     static/index.html    the dashboard page (inline CSS/JS, no build step)
   tests/
   runs/                  git-ignored run logs
+  pins.json              git-ignored dashboard pins (created on first use)
   config.toml            ports, model, timeouts (tick rate lives in the plugin config)
 mod/                     C# BepInEx plugin
   JevSurvivors/          Plugin.cs, Transport.cs, StateSampler.cs, Movement.cs, MenuDriver.cs, Patches.cs
