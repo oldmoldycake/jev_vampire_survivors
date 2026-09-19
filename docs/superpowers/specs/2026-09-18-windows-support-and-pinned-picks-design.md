@@ -32,18 +32,32 @@ except where marked **unverified**.
   (`VampireSurvivors.exe` is an ELF, plus `VampireSurvivors_Data/Managed/` and `MonoBleedingEdge/`)
   **and** the Windows IL2CPP payload: `GameAssembly.dll` and `UnityPlayer.dll` are PE32+, and
   `VampireSurvivors_Data/il2cpp_data/Metadata/global-metadata.dat` is present.
-- **Correction, 2026-09-18 22:00:** this stopped being true during Phase 0 preparation.
-  **Observed:** `VampireSurvivors.exe` in this folder is now a PE32+ Windows binary with mtime
-  2026-09-18 21:03; `VampireSurvivors_Data/Managed/` and `MonoBleedingEdge/` are gone;
-  `GameAssembly.dll` is unchanged since 2026-09-11; and `appmanifest_1794680.acf` carries no
-  `platform_override` keys with `LastUpdated` 2026-09-11, so the Steam client did not do it.
-  **Most likely cause, not observed:** a steamcmd run with `+@sSteamCmdForcePlatformType windows`
-  whose `force_install_dir` still pointed at the Steam library, which would rewrite only the
-  differing files (the 672K exe) and prune the Mono-only directories, leaving the already-matching
-  Windows payload alone. Restoration is pending; see
-  `docs/superpowers/plans/2026-09-18-linux-install-recovery.md`. The design conclusion the
-  bullet supports still holds: both builds' files can coexist, and the IL2CPP inputs needed for
-  interop generation are present without downloading a depot.
+- **Correction, 2026-09-18 22:00, resolved 22:45:** this folder briefly stopped holding the Linux
+  build at all, and the cause is worth recording because it is a trap anyone porting this project
+  will meet.
+  **What happened:** forcing a Steam Play compatibility tool on an app makes Steam install that
+  app's *Windows* depot into the same directory. Vampire Survivors (`1794680`) was mapped to
+  `GE-Proton11-1` in `~/.local/share/Steam/config/config.vdf` under `CompatToolMapping`, so Steam
+  replaced the Linux payload in place: `VampireSurvivors.exe` became a PE32+ binary (mtime
+  2026-09-18 21:03) and `VampireSurvivors_Data/Managed/` and `.../MonoBleedingEdge/` were pruned.
+  `GameAssembly.dll` was left untouched because the Windows payload was already present and
+  matched — which is exactly what the bullet above describes.
+  **How it was confirmed:** the `1794680` entry was read directly out of `CompatToolMapping`
+  while the folder was in the broken state; removing the compatibility tool in Steam made the
+  entry disappear and Steam restored the Linux depot — ELF `VampireSurvivors.exe`,
+  `Managed/` with all ten assemblies `JevSurvivors.csproj` references,
+  `VampireSurvivors_Data/MonoBleedingEdge/`, `UnityPlayer.so` and `launcher.sh`, with the
+  appmanifest back to `StateFlags 4`. A `steamcmd` platform override was the initial hypothesis
+  and was **wrong**; `appmanifest_1794680.acf` never carried `platform_override` keys, which is
+  what first suggested the Steam client was not involved and turned out to be a misreading —
+  Steam records the choice in `config.vdf`, not in the app manifest.
+  **Consequence for Part B:** the Linux install and the Windows depot cannot share a Steam
+  library entry. The Windows copy has to live outside it (`~/games/vs-windows`), and any
+  instruction that switches the Steam app's platform — a compatibility tool as much as a
+  `steamcmd` override — destroys the verified Linux install this project is developed against.
+  The design conclusion the bullet above supports still holds: both builds' *files* can coexist
+  in one folder, and the IL2CPP inputs needed for interop generation are present without
+  downloading a depot.
 - The Windows player is therefore IL2CPP, confirming what README's Platform support section claims.
   The Windows `VampireSurvivors.exe` is not on disk — the ELF of the same name occupies it. **Superseded 2026-09-18 22:00 — see the correction at the end of this group.**
 - `steam_appid.txt` is `1794680`.

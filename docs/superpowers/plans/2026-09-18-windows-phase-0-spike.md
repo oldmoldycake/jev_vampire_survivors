@@ -92,9 +92,10 @@ into `~/.steam/steamcmd/` before doing anything else, so expect a self-update pa
 
 - [ ] **Check the target is not inside a Steam library — before anything downloads**
 
-This exact command, with `force_install_dir` pointing into `~/.local/share/Steam/steamapps/common`,
-overwrote the Linux install on 2026-09-18 and cost a re-download. Run the check first; it is the
-reason this step exists:
+A `force_install_dir` pointing into `~/.local/share/Steam/steamapps/common` would overwrite the
+verified Linux install with the Windows depot. That hazard is real but is *not* what happened on
+2026-09-18 — see the box below. Run the check anyway; it costs nothing and the failure mode is a
+re-download:
 
 ```bash
 T=~/games/vs-windows
@@ -150,6 +151,17 @@ take and the whole port's premise needs re-checking.
 ## Step H2 (human): boot it under Proton
 
 **Exit criterion 2.** Needs a GUI Steam session.
+
+> **Never force a Steam Play compatibility tool on Vampire Survivors itself (app `1794680`).**
+> This is what actually destroyed the Linux install on 2026-09-18: forcing a compatibility tool
+> makes Steam install that app's *Windows* depot into the same directory, replacing the Linux
+> payload in place — the ELF becomes a PE32+ and `Managed/` and `MonoBleedingEdge/` are pruned,
+> which leaves the plugin unbuildable. Recovery is to untick the compatibility tool and let Steam
+> re-download the Linux depot.
+>
+> The Windows copy is run as a **separate non-Steam shortcut** pointing at
+> `~/games/vs-windows/VampireSurvivors.exe`, exactly as below. That is safe: the shortcut has its
+> own app id and its own compatibility setting, and touches nothing in the Steam library entry.
 
 - [ ] **Make sure the app id file is there** (helps Steam API init outside the client)
 
