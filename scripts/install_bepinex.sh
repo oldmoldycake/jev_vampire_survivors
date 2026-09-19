@@ -4,10 +4,17 @@ set -euo pipefail
 GAME_DIR="${GAME_DIR:-$HOME/.local/share/Steam/steamapps/common/Vampire Survivors}"
 
 # This installs the Linux Mono flavour of BepInEx 5. Unpacking it into the Windows IL2CPP build
-# produces a game that loads nothing and a folder that is hard to untangle afterwards.
-if [ -d "$GAME_DIR" ] && [ ! -d "$GAME_DIR/VampireSurvivors_Data/Managed" ] && [ -d "$GAME_DIR/VampireSurvivors_Data/il2cpp_data" ]; then
-  echo "$GAME_DIR holds the Windows IL2CPP build, not the Linux Mono build." >&2
-  echo "BepInEx 5 Linux cannot load it. Restore the Linux build first:" >&2
+# produces a game that loads nothing and a folder that is hard to untangle afterwards. The question
+# is "is a game here, and is it the wrong flavour", so VampireSurvivors_Data gates the check and
+# Managed/ answers it; il2cpp_data only sharpens the message, as in deploy_mod.sh. Testing the
+# directory rather than a specific assembly is deliberate: only the build's flavour matters here,
+# while deploy_mod.sh must confirm the exact file it compiles against.
+if [ -d "$GAME_DIR/VampireSurvivors_Data" ] && [ ! -d "$GAME_DIR/VampireSurvivors_Data/Managed" ]; then
+  echo "$GAME_DIR holds a game, but not the Linux Mono build: VampireSurvivors_Data/Managed is missing." >&2
+  if [ -d "$GAME_DIR/VampireSurvivors_Data/il2cpp_data" ]; then
+    echo "This looks like the Windows IL2CPP build. BepInEx 5 Linux cannot load it." >&2
+  fi
+  echo "Restore the Linux build first:" >&2
   echo "  Steam -> Vampire Survivors -> Properties -> Installed Files -> Verify integrity of game files" >&2
   exit 1
 fi
