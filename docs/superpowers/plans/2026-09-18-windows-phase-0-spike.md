@@ -90,20 +90,11 @@ command -v steamcmd || paru -S steamcmd
 It is a wrapper around Valve's own bootstrap: the first `steamcmd` run downloads the real client
 into `~/.steam/steamcmd/` before doing anything else, so expect a self-update pass.
 
-- [ ] **Download the Windows depot into a fresh directory**
+- [ ] **Check the target is not inside a Steam library — before anything downloads**
 
-```bash
-mkdir -p ~/games/vs-windows
-steamcmd +@sSteamCmdForcePlatformType windows \
-         +login <your-steam-account> \
-         +force_install_dir ~/games/vs-windows \
-         +app_update 1794680 validate \
-         +quit
-```
-
-It will prompt for the password and Steam Guard code. **Before running steamcmd, check the target is not inside a Steam library.** This exact command
-with `force_install_dir` pointing into `~/.local/share/Steam/steamapps/common` overwrote the
-Linux install on 2026-09-18 and cost a re-download:
+This exact command, with `force_install_dir` pointing into `~/.local/share/Steam/steamapps/common`,
+overwrote the Linux install on 2026-09-18 and cost a re-download. Run the check first; it is the
+reason this step exists:
 
 ```bash
 T=~/games/vs-windows
@@ -115,9 +106,24 @@ esac
 file ~/.local/share/Steam/steamapps/common/"Vampire Survivors"/VampireSurvivors.exe   # ELF, before
 ```
 
-If the files land in steamcmd's own `steamapps/` rather than the target, re-run with
-`+force_install_dir` before `+login` — **after** re-checking the target with the case statement
-above. Then confirm the Steam install is still an ELF with the same `file` command.
+Expected: `target ok: /home/<you>/games/vs-windows`, and the Steam install reporting `ELF 64-bit`.
+A `REFUSING:` line means stop and choose a different target.
+
+- [ ] **Download the Windows depot into that directory**
+
+```bash
+mkdir -p ~/games/vs-windows
+steamcmd +@sSteamCmdForcePlatformType windows \
+         +login <your-steam-account> \
+         +force_install_dir ~/games/vs-windows \
+         +app_update 1794680 validate \
+         +quit
+```
+
+It will prompt for the password and Steam Guard code. If the files land in steamcmd's own
+`steamapps/` rather than the target, re-run with `+force_install_dir` before `+login` — after
+re-running the preflight above. Then confirm the Steam install is still an ELF with the same `file`
+command.
 
 - [ ] **Check what arrived and report it**
 
