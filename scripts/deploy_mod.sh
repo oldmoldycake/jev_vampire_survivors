@@ -11,6 +11,19 @@ command -v dotnet >/dev/null || {
   echo '  curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 8.0' >&2
   exit 1
 }
+
+# Both builds ship under the same folder name and steamcmd with a platform override will swap one
+# for the other in place. Absence of Managed/ is the reliable test: the Mono install also carries
+# the Windows IL2CPP payload (GameAssembly.dll, il2cpp_data), so those prove nothing on their own.
+if [ ! -f "$GAME_DIR/VampireSurvivors_Data/Managed/VampireSurvivors.Runtime.dll" ]; then
+  echo "$GAME_DIR does not hold the Linux Mono build." >&2
+  echo "VampireSurvivors_Data/Managed/VampireSurvivors.Runtime.dll is missing, and this plugin is built against it." >&2
+  if [ -d "$GAME_DIR/VampireSurvivors_Data/il2cpp_data" ] && [ ! -d "$GAME_DIR/VampireSurvivors_Data/Managed" ]; then
+    echo "This looks like the Windows IL2CPP build. Restore the Linux one:" >&2
+    echo "  Steam -> Vampire Survivors -> Properties -> Installed Files -> Verify integrity of game files" >&2
+  fi
+  exit 1
+fi
 [ -f "$GAME_DIR/BepInEx/core/BepInEx.dll" ] || { echo "BepInEx not installed; run scripts/install_bepinex.sh first" >&2; exit 1; }
 
 dotnet build -c Release "-p:GameDir=$GAME_DIR" "$@"

@@ -14,7 +14,11 @@ published to PyPI or to a mod portal.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- `scripts/deploy_mod.sh` and `scripts/install_bepinex.sh` now refuse a game folder holding the
+  Windows IL2CPP build instead of failing later with an unresolvable reference or unpacking a
+  Mono loader into it, and say how to restore the Linux build.
 
 ## [0.1.0] - 2026-09-18
 
